@@ -1,0 +1,65 @@
+{
+  "/inventory/boxes": {
+    "header": {
+      "timestamp": 0,
+      "module_id": "demo",
+      "correlation_id": "mock-boxes",
+      "version": 1
+    },
+    "type": "BoxArray",
+    "data": {
+      "items": [
+        {
+          "id": 3,
+          "color": "green",
+          "kind": "big_box",
+          "pose": {
+            "x": 3490.7,
+            "y": 9909.9,
+            "z": 0,
+            "roll": 0,
+            "pitch": 0,
+            "yaw": 0
+          }
+        },
+        {
+          "id": 1,
+          "color": "red",
+          "kind": "small_box",
+          "pose": {
+            "x": 10,
+            "y": 20,
+            "z": 0,
+            "roll": 0,
+            "pitch": 0,
+            "yaw": 0
+          }
+        }
+      ]
+    }
+  },
+  "/system/modules": {
+    "header": {
+      "timestamp": 0,
+      "module_id": "demo",
+      "correlation_id": "mock-mods",
+      "version": 1
+    },
+    "type": "ModulePoseArray",
+    "data": {
+      "items": [
+        {
+          "namespace": "uarm_01",
+          "pose": {
+            "x": 689.3,
+            "y": 700.9,
+            "z": 105,
+            "roll": 0,
+            "pitch": 0,
+            "yaw": -3.14
+          }
+        }
+      ]
+    }
+  }
+}
