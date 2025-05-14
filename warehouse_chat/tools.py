@@ -7,6 +7,21 @@ from mqtt_listener import get
 def _nf(entity: str, key: Any) -> Dict[str, Any]:
     return {"found": False, "error": f"{entity} '{key}' not found"}
 
+logging.getLogger().setLevel(logging.INFO)
+
+# box list
+@tool
+def list_boxes() -> list:
+    """Return summary (ID, color, kind) of all visible boxes. No pose info included."""
+    env = get("/inventory/boxes")
+    if not env:
+        print("DEBUG: No snapshot available for /inventory/boxes")
+        return []
+    print("DEBUG: Snapshot contains:", env.data["items"])
+    return [{"id": b["id"], "color": b["color"], "kind": b["kind"]} for b in env.data["items"]]
+
+
+
 # box pose
 @tool(args_schema={"box_id": int})
 def find_box(box_id: int):
@@ -52,5 +67,6 @@ def find_box_by_color(color: str):
 
 
 
-ALL_TOOLS = [find_box, find_box_by_color, find_module]
+ALL_TOOLS = [find_box, find_box_by_color, find_module, list_boxes]
+
 

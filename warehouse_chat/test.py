@@ -1,6 +1,6 @@
 import json, paho.mqtt.client as mqtt, time
 
-BROKER = "localhost"
+BROKER = "192.168.50.100"
 TOPIC  = "/inventory/boxes"
 
 payload = {

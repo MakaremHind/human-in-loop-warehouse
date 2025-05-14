@@ -1,6 +1,6 @@
 import json, time, argparse, paho.mqtt.client as mqtt
 
-BROKER = "localhost"
+BROKER = "192.168.50.100"
 PORT   = 1883
 
 def main(loop=False, sleep=5):
@@ -17,9 +17,9 @@ def main(loop=False, sleep=5):
                     m["topic"],
                     json.dumps(m["payload"]),
                     qos=0,
-                    retain=m.get("retain", False)
+                    retain=True  # Force retain to ensure broker holds snapshot
                 )
-                print(f"→ sent to {m['topic']}")
+                print(f"→ sent to {m['topic']} (retain=True)")
             if not loop:
                 break
             time.sleep(sleep)
