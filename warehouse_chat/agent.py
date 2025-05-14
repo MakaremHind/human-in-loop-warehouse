@@ -16,7 +16,7 @@ llm = ChatOllama(model=MODEL, temperature=0.0)
 class Memory(TypedDict):
     messages: Annotated[list, add_messages]
 
-# 🔧 Updated instructions with reasoning + tool clarity
+# Updated instructions with reasoning + tool clarity
 BASE_PROMPT = (
     "You are a warehouse assistant.\n"
     "You may either:\n"

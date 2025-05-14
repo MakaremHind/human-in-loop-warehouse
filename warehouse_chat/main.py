@@ -1,10 +1,4 @@
 # main.py
-"""
-Main entry point for the warehouse assistant chat loop.
-Continuously accepts user input, routes it through the LangGraph agent,
-and prints the assistant's response.
-"""
-
 from langchain_core.messages import HumanMessage
 from agent import agent
 import mqtt_listener  # ensures MQTT listener is running

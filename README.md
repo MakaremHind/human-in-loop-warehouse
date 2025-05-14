@@ -1,113 +1,45 @@
-# human-in-loop-warehouse
-A LangGraph-powered LLM agent for natural language control of a modular material handling system using MQTT-based real-time data.
+# Warehouse Assistant – LangGraph Agent
 
-# `agent.py` – Final Version (Documented)
+This project builds a conversational agent for monitoring and interacting with a modular warehouse system. It uses LangGraph for reasoning, MQTT for real-time data, and LangChain tools for querying the environment.
 
-This file defines a memory-aware warehouse assistant agent using LangGraph and LangChain. It combines LLM-driven reasoning with explicit tool use for answering live queries about warehouse state.
+## What It Does
 
----
+The assistant understands natural language and:
 
-## Key Features
+* Remembers past answers to avoid repeating tool calls
+* Uses tools to fetch live MQTT data when needed
+* Answers intelligently using past facts or current data
 
-- Supports memory-aware reasoning: Uses prior responses to reduce redundant tool calls
-- Enforces correct tool usage: Ensures positional questions always use `find_box()`
-- Includes flexible tools: ID, color, module, and list queries
-- Based on LangGraph + Ollama LLM pipeline
+## Available Tools
 
----
+| Tool                | Description                                  |
+| ------------------- | -------------------------------------------- |
+| `find_box`          | Get full pose of a box by ID                 |
+| `find_box_by_color` | Get pose of the first box with a given color |
+| `find_module`       | Get pose of a module by namespace            |
+| `list_boxes`        | List visible boxes (ID, color, kind only)    |
 
-## File Structure
+## Behavior
 
-### Configuration
-```python
-MODEL = os.getenv("OLLAMA_MODEL", "qwen3:latest")
-llm = ChatOllama(model=MODEL, temperature=0.0)
-```
+* Use `find_box` for box location questions.
+* Use `list_boxes` for general inventory summaries.
+* Answer directly if the info is already known.
 
-### Memory State Definition
-```python
-class Memory(TypedDict):
-    messages: Annotated[list, add_messages]
-```
+## How It Works
 
----
+1. The system uses an Ollama-hosted LLM (`qwen3:latest` by default).
+2. It keeps track of messages (memory) for reasoning.
+3. It parses tool calls using patterns like:
 
-## System Prompt
+   ```
+   CALL find_box {"box_id": 3}
+   ```
+4. It returns tool results as clear natural language responses.
 
-Instructs the LLM to either:
-- Call a tool with a JSON payload
-- Or reason from prior facts (recent tool outputs)
+## Example Questions
 
-### Important Rules
+* "Where is the box with ID 1?"
+* "Is there any red box in the system?"
+* "List all the boxes"
 
-- Use `find_box` for position (pose) lookups
-- Use `list_boxes()` only for summaries
-- Do not guess pose values
-
----
-
-## LLM Node: `llm_node()`
-
-Injects a system prompt and the last 5 non-tool assistant responses as context.
-
-```python
-response = llm.invoke([system_prompt, *state["messages"]])
-```
-
----
-
-## Tool Execution Node: `run_tool()`
-
-Parses tool calls in format:
-```text
-CALL tool_name {"key": value}
-```
-
-Then:
-- Finds the matching tool in `ALL_TOOLS`
-- Invokes it with parsed arguments
-- Formats the result for natural language output
-
-Special handling for:
-- `find_box` → returns full pose
-- `list_boxes` → returns box summaries
-
----
-
-## Routing: `route()`
-
-Decides whether the LLM's message contains a tool call:
-```python
-return "tool" if CALL_RE.search(last) else "end"
-```
-
----
-
-## Graph Assembly
-
-Creates a LangGraph with:
-- Entry at `llm_node`
-- Conditional edge to `run_tool`
-- Exit after tool execution
-
-```python
-graph.set_entry_point("llm")
-graph.add_conditional_edges("llm", route)
-graph.set_finish_point("tool")
-agent = graph.compile()
-```
-
----
-
-## Summary
-
-This version balances:
-- Predictable tool usage
-- Reasoned answers when appropriate
-- Safety against hallucinations
-
-You can now ask:
-- “Where is the box with ID 3?”
-- “Are there any small boxes?”
-- “What boxes are visible?”
-
+This assistant combines real-time sensor integration with memory-aware AI to support a natural control interface for a warehouse system.
