@@ -28,7 +28,9 @@ BASE_PROMPT = (
     "- find_box(box_id:int)           → gives full pose\n"
     "- find_box_by_color(color:str)  → gives full pose\n"
     "- find_module(namespace:str)\n"
-    "- list_boxes()                  → summary only (NO pose)\n\n"
+    "- list_boxes()                  → summary only (NO pose)\n"
+    "- find_last_order()             → recent order summary\n"
+
     "If the user asks for a box's position, ALWAYS use find_box.\n"
     "Do NOT guess or use list_boxes for positions.\n"
     "Answer directly only if you already know the pose from earlier turns."
@@ -98,6 +100,19 @@ def run_tool(state: Memory) -> Memory:
             txt += "\n\nTo get exact position, use: CALL find_box {\"box_id\": N}"
         else:
             txt = "No boxes are currently visible."
+            
+    elif name == "find_last_order":
+        if "order" in result:
+            order = result["order"]
+            txt = (
+                f"Last order:\n"
+                f"- From: {order['starting_module']['namespace']}\n"
+                f"- To: {order['goal']['namespace']}\n"
+                f"- Cargo: {order['cargo_box']['color']} {order['cargo_box']['type']} box (ID {order['cargo_box']['id']})"
+            )
+        else:
+            txt = result["error"]
+
 
     else:
         txt = json.dumps(result)

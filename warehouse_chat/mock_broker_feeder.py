@@ -1,6 +1,6 @@
 import json, time, argparse, paho.mqtt.client as mqtt
 
-BROKER = "192.168.50.100"
+BROKER = "localhost"#"192.168.50.100"
 PORT   = 1883
 
 def main(loop=False, sleep=5):

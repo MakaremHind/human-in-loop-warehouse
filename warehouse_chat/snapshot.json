@@ -61,5 +61,147 @@
         }
       ]
     }
+  },
+  "base_01/order_request": {
+    "header": {
+      "timestamp": 1747310434.859188,
+      "sender_id": "OrderGenerator",
+      "correlation_id": "f234c44d-1556-4db7-b929-9b341760e029"
+    },
+    "starting_module": {
+      "namespace": "conveyor_02",
+      "pose": {
+        "x": 872.65,
+        "y": 873.91,
+        "z": 58,
+        "roll": 0,
+        "pitch": 0,
+        "yaw": -3.14159265
+      }
+    },
+    "goal": {
+      "namespace": "container_01",
+      "pose": {
+        "x": 102.34,
+        "y": 186.91,
+        "z": 90,
+        "roll": 0,
+        "pitch": 0,
+        "yaw": 1.57079633
+      }
+    },
+    "cargo_box": {
+      "id": 348,
+      "color": "red",
+      "type": "small",
+      "global_pose": {
+        "x": 0,
+        "y": 0,
+        "z": 0,
+        "roll": 0,
+        "pitch": 0,
+        "yaw": 0
+      }
+    }
+  },
+  "base_01/order_result": {
+    "header": {
+      "timestamp": 1747310439.860502,
+      "module_id": "mock_handler",
+      "correlation_id": "f234c44d-1556-4db7-b929-9b341760e029",
+      "version": 1.0
+    },
+    "starting_module": {
+      "namespace": "conveyor_02",
+      "pose": {
+        "x": 872.65,
+        "y": 873.91,
+        "z": 58,
+        "roll": 0,
+        "pitch": 0,
+        "yaw": -3.14159265
+      }
+    },
+    "goal": {
+      "namespace": "container_01",
+      "pose": {
+        "x": 102.34,
+        "y": 186.91,
+        "z": 90,
+        "roll": 0,
+        "pitch": 0,
+        "yaw": 1.57079633
+      }
+    },
+    "cargo_box": {
+      "id": 348,
+      "color": "red",
+      "type": "small",
+      "global_pose": {
+        "x": 0,
+        "y": 0,
+        "z": 0,
+        "roll": 0,
+        "pitch": 0,
+        "yaw": 0
+      }
+    }
+  },
+  "inventory/boxes": {
+    "header": {
+      "timestamp": 0,
+      "module_id": "demo",
+      "correlation_id": "mock-boxes",
+      "version": 1
+    },
+    "boxes": [
+      {
+        "id": 3,
+        "color": "green",
+        "type": "big_box",
+        "global_pose": {
+          "x": 3490.7,
+          "y": 9909.9,
+          "z": 0,
+          "roll": 0,
+          "pitch": 0,
+          "yaw": 0
+        }
+      },
+      {
+        "id": 1,
+        "color": "red",
+        "type": "small_box",
+        "global_pose": {
+          "x": 10,
+          "y": 20,
+          "z": 0,
+          "roll": 0,
+          "pitch": 0,
+          "yaw": 0
+        }
+      }
+    ]
+  },
+  "system/modules": {
+    "header": {
+      "timestamp": 0,
+      "module_id": "demo",
+      "correlation_id": "mock-mods",
+      "version": 1
+    },
+    "modules": [
+      {
+        "namespace": "uarm_01",
+        "pose": {
+          "x": 689.3,
+          "y": 700.9,
+          "z": 105,
+          "roll": 0,
+          "pitch": 0,
+          "yaw": -3.14
+        }
+      }
+    ]
   }
 }
