@@ -7,6 +7,7 @@ from mqtt_listener import get
 from snapshot_manager import snapshot_store
 
 BROKER = "localhost"
+PORT = 1883
 ORDER_REQUEST_TOPIC = "base_01/order_request"
 ORDER_RESULT_TOPIC = "base_01/order_result"
 
@@ -85,65 +86,6 @@ def find_box_by_color(color: str):
 
     return {"found": True, **matches[0]}
 
-@tool(args_schema={
-    "start": str,
-    "goal": str,
-    "color": str,
-    "box_id": int
-})
-def trigger_order(start: str, goal: str, color: str, box_id: int):
-    """Trigger a transport order and wait for result in background."""
-
-    global _result_listener_started
-    if not _result_listener_started:
-        _start_result_listener()
-        _result_listener_started = True
-
-    correlation_id = str(uuid.uuid4())
-    payload = {
-        "header": {
-            "timestamp": time.time(),
-            "sender_id": "chatbot",
-            "correlation_id": correlation_id
-        },
-        "starting_module": {
-            "namespace": start,
-            "pose": {"x": 0, "y": 0, "z": 0, "roll": 0, "pitch": 0, "yaw": 0}
-        },
-        "goal": {
-            "namespace": goal,
-            "pose": {"x": 0, "y": 0, "z": 0, "roll": 0, "pitch": 0, "yaw": 0}
-        },
-        "cargo_box": {
-            "id": box_id,
-            "color": color,
-            "type": "small",
-            "global_pose": {"x": 0, "y": 0, "z": 0, "roll": 0, "pitch": 0, "yaw": 0}
-        }
-    }
-
-    client = mqtt.Client()
-    client.connect(BROKER, 1883, 60)
-    client.publish(ORDER_REQUEST_TOPIC, json.dumps(payload))
-    client.disconnect()
-
-    # Wait for result
-    for _ in range(20):  # wait up to 10 seconds
-        time.sleep(0.5)
-        with _order_lock:
-            if correlation_id in _order_results:
-                result = _order_results.pop(correlation_id)
-                return {
-                    "found": True,
-                    "success": result.get("success", False),
-                    "details": result
-                }
-
-    return {
-        "found": False,
-        "error": f"Order timed out waiting for result (correlation_id={correlation_id})"
-    }
-
 @tool
 def find_last_order(args: dict = {}) -> dict:
     """Returns the most recently completed order from the warehouse."""
@@ -157,6 +99,79 @@ def find_last_order(args: dict = {}) -> dict:
         return {"found": True, "order": env.data["order"]}
     except Exception as e:
         return {"found": False, "error": f"Failed to normalize order: {e}"}
+    
+@tool(args_schema={
+    "start": str,
+    "goal": str,
+    "color": str,
+    "box_id": int
+})
+def trigger_order(start: str, goal: str, color: str, box_id: int) -> dict:
+    """Trigger a transport order and wait for result in background."""
+
+    global _result_listener_started
+    if not _result_listener_started:
+        _start_result_listener()
+        _result_listener_started = True
+
+    correlation_id = str(uuid.uuid4())
+
+    payload = {
+        "header": {
+            "timestamp": time.time(),
+            "sender_id": "OrderGenerator",  # ✅ match mock_order_generator
+            "correlation_id": correlation_id
+        },
+        "starting_module": {
+            "namespace": start,
+            "pose": {
+                "x": 0, "y": 0, "z": 0,
+                "roll": 0, "pitch": 0, "yaw": 0
+            }
+        },
+        "goal": {
+            "namespace": goal,
+            "pose": {
+                "x": 0, "y": 0, "z": 0,
+                "roll": 0, "pitch": 0, "yaw": 0
+            }
+        },
+        "cargo_box": {
+            "id": box_id,
+            "color": color,
+            "type": "small",  # You can make this smarter if needed
+            "global_pose": {
+                "x": 0, "y": 0, "z": 0,
+                "roll": 0, "pitch": 0, "yaw": 0
+            }
+        }
+    }
+
+    client = mqtt.Client()
+    client.connect(BROKER, PORT, 60)
+    client.loop_start()
+    client.publish(ORDER_REQUEST_TOPIC, json.dumps(payload), qos=1)
+    client.disconnect()
+    print(f"[trigger_order] 📤 Published order to {ORDER_REQUEST_TOPIC}")
+
+    # ⏳ Wait for result
+    for i in range(20):
+        print(f"[trigger_order] ⏳ Waiting for result... {correlation_id}")
+        time.sleep(0.5)
+        with _order_lock:
+            if correlation_id in _order_results:
+                result = _order_results.pop(correlation_id)
+                return {
+                    "found": True,
+                    "success": result.get("success", False),
+                    "details": result
+                }
+
+    return {
+        "found": False,
+        "error": f"Timeout waiting for result for ID {correlation_id}"
+    }
+
 
 ALL_TOOLS = [
     find_box,

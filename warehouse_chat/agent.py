@@ -16,7 +16,6 @@ llm = ChatOllama(model=MODEL, temperature=0.0)
 class Memory(TypedDict):
     messages: Annotated[list, add_messages]
 
-# Updated instructions with reasoning + tool clarity
 BASE_PROMPT = (
     "You are a warehouse assistant.\n"
     "You may either:\n"
@@ -30,108 +29,81 @@ BASE_PROMPT = (
     "- find_module(namespace:str)\n"
     "- list_boxes()                  → summary only (NO pose)\n"
     "- find_last_order()             → recent order summary\n"
-
-    "If the user asks for a box's position, ALWAYS use find_box.\n"
-    "Do NOT guess or use list_boxes for positions.\n"
-    "Answer directly only if you already know the pose from earlier turns."
+    "- trigger_order(start:str, goal:str, color:str, box_id:int)\n\n"
+    "If the user says: move box 3 from conveyor_02 to container_01,\n"
+    "plan the needed tool calls and then execute them step by step.\n"
 )
 
 # ───────── LLM node ─────────
 def llm_node(state: Memory) -> Memory:
-    facts = []
-    for msg in state["messages"]:
-        if isinstance(msg, AIMessage) and not msg.content.strip().startswith("CALL "):
-            facts.append(msg.content)
-
-    context = BASE_PROMPT + "\n\nHere’s what you know so far:\n" + "\n".join(facts[-5:])
-    system_prompt = AIMessage(role="system", content=context)
+    facts = [msg.content for msg in state["messages"] if isinstance(msg, AIMessage) and not msg.content.startswith("CALL")]
+    system_prompt = AIMessage(role="system", content=BASE_PROMPT + "\n\nHere’s what you know so far:\n" + "\n".join(facts[-5:]))
     response = llm.invoke([system_prompt, *state["messages"]])
     return {"messages": state["messages"] + [response]}
 
-
-# Match tool calls, including tools with no arguments
+# ───────── Match tool calls ─────────
 CALL_RE = re.compile(r"\bCALL\s+(\w+)(?:\s+(\{[^{}]*\}))?", re.S)
 
-# ───────── Tool runner node ─────────
+# ───────── Tool runner ─────────
 def run_tool(state: Memory) -> Memory:
     msg = state["messages"][-1].content
     match = CALL_RE.search(msg)
-
     if not match:
-        return {
-            "messages": [AIMessage(
-                content="Tool call not understood. Use JSON like: CALL find_box {\"box_id\": 3}"
-            )]
-        }
-
+        return {"messages": state["messages"] + [AIMessage(content="Tool call not understood.")]}
+    
     name, js = match.groups()
     args = json.loads(js) if js else {}
-
-    if name == "find_module" and "module_id" in args and "namespace" not in args:
-        args["namespace"] = args.pop("module_id")
 
     for tool in ALL_TOOLS:
         if tool.name == name:
             result = tool.invoke(args)
             break
     else:
-        return {"messages": [AIMessage(content=f"Unknown tool {name}")]}
+        return {"messages": state["messages"] + [AIMessage(content=f"Unknown tool {name}")]}
 
     logging.info("🛠 Tool '%s' result: %s", name, result)
 
     if isinstance(result, dict) and not result.get("found"):
-        txt = result["error"]
+        return {"messages": state["messages"] + [AIMessage(content=result["error"])]}
 
-    elif name in {"find_box", "find_box_by_color"}:
+    if name in {"find_box", "find_box_by_color"}:
         pose = result["pose"]
-        txt = (f"Box {result['id']} ({result['color']}, {result['kind']}) "
-               f"is at x = {pose['x']:.0f} mm, y = {pose['y']:.0f} mm, "
-               f"z = {pose['z']:.0f} mm.")
-
-    elif name == "find_module":
-        pose = result["pose"]
-        txt = (f"Module {result['namespace']} is at x = {pose['x']:.0f} mm, "
-               f"y = {pose['y']:.0f} mm, z = {pose['z']:.0f} mm.")
-
-    elif name == "list_boxes":
-        if isinstance(result, list) and result:
-            lines = [f"- Box {b['id']}: {b['color']} ({b['kind']})" for b in result]
-            txt = "Currently visible boxes:\n" + "\n".join(lines)
-            txt += "\n\nTo get exact position, use: CALL find_box {\"box_id\": N}"
-        else:
-            txt = "No boxes are currently visible."
-            
+        txt = f"Box {result['id']} ({result['color']}, {result['kind']}) is at x={pose['x']:.0f}, y={pose['y']:.0f}, z={pose['z']:.0f}."
+    elif name == "trigger_order":
+        txt = "✅ Order triggered. " + ("Success!" if result.get("success") else "Failed.")
     elif name == "find_last_order":
-        if "order" in result:
-            order = result["order"]
-            txt = (
-                f"Last order:\n"
-                f"- From: {order['starting_module']['namespace']}\n"
-                f"- To: {order['goal']['namespace']}\n"
-                f"- Cargo: {order['cargo_box']['color']} {order['cargo_box']['type']} box (ID {order['cargo_box']['id']})"
-            )
-        else:
-            txt = result["error"]
-
-
+        order = result["order"]
+        txt = f"Last order:\n- From: {order['starting_module']['namespace']}\n- To: {order['goal']['namespace']}\n- Cargo: {order['cargo_box']['color']} {order['cargo_box']['type']} box (ID {order['cargo_box']['id']})"
     else:
         txt = json.dumps(result)
 
     return {"messages": state["messages"] + [AIMessage(content=txt)]}
 
+# ───────── Planner: expand multi-step commands ─────────
+def planner_node(state: Memory) -> Memory:
+    planner_prompt = AIMessage(role="system", content=BASE_PROMPT + "\n\nPlan your tool calls step-by-step.")
+    response = llm.invoke([planner_prompt, *state["messages"]])
+    return {"messages": state["messages"] + [response]}
 
-# ───────── Decision logic ─────────
-def route(state: Memory) -> str:
+# ───────── Routing ─────────
+def router(state: Memory) -> str:
     last = state["messages"][-1].content
-    return "tool" if CALL_RE.search(last) else "end"
+    if "CALL" in last:
+        return "tool"
+    elif any(k in last.lower() for k in ["move box", "transfer box", "transport"]):
+        return "planner"
+    else:
+        return "end"
 
 # ───────── LangGraph wiring ─────────
 graph = StateGraph(Memory)
 graph.add_node("llm", llm_node)
 graph.add_node("tool", RunnableLambda(run_tool))
+graph.add_node("planner", planner_node)
 graph.set_entry_point("llm")
-graph.add_conditional_edges("llm", route)
-graph.set_finish_point("tool")
-
+graph.add_conditional_edges("llm", router)
+graph.add_edge("planner", "llm")
+graph.add_edge("tool", "llm")
+graph.set_finish_point("llm")
 
 agent = graph.compile()
