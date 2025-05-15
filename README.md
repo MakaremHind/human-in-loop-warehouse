@@ -10,20 +10,18 @@ The assistant understands natural language and:
 - Uses tools to fetch live MQTT data when needed
 - Answers intelligently using past facts or current data
 - Can track and report the most recent order in the system
+- Can **trigger transport orders** (e.g. move a box from module A to B) and **await the result**
 
 ## 🟢 Start the System
 
    ```bash
-   # Start MQTT listener (receives data)
-   python mqtt_listener.py
-
    # Start mock order handler (simulates execution)
    python mock_order_handler.py
 
    # Launch the assistant
    python main.py
 
-   ## publish data
+   # Optional: publish test data
    python scripts/mock_order_generator.py
    python mock_broker_feeder.py
    ```
@@ -38,13 +36,17 @@ The assistant understands natural language and:
 | `find_module`       | Get pose of a module by namespace                    |
 | `list_boxes`        | List visible boxes (ID, color, kind only)            |
 | `find_last_order`   | Retrieve the most recent completed transport order   |
+| `trigger_order`     | Trigger a transport order and wait for the result    |
 
 ## Behavior
 
 - Uses `find_box` if a box's position is requested
 - Uses `list_boxes` for a summary of visible boxes
 - Uses `find_last_order` to check the latest order processed
+- Uses trigger_order when asked to move a box from one module to another
 - Avoids redundant tool use by reasoning from memory if the info was already retrieved
+- Tracks the correlation ID and waits for a real MQTT response
+
 
 ## How It Works
 
@@ -62,6 +64,7 @@ The assistant understands natural language and:
 - "Is there any red box in the system?"
 - "List all the boxes"
 - "What was the last order executed?"
+- “Move the box 1 from conveyor_02 to container_01”
 
 
 
