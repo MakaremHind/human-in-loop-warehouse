@@ -11,8 +11,9 @@ The assistant understands natural language and:
 - Answers intelligently using past facts or current data
 - Can track and report the most recent order in the system
 - Can **trigger transport orders** (e.g. move a box from module A to B) and **await the result**
+- Can **cancel an active transport order** using its correlation ID and suppress its final result
 
-## 🟢 Start the System
+## Start the System
 
    ```bash
    # Start mock order handler (simulates execution)
@@ -37,6 +38,7 @@ The assistant understands natural language and:
 | `list_boxes`        | List visible boxes (ID, color, kind only)            |
 | `find_last_order`   | Retrieve the most recent completed transport order   |
 | `trigger_order`     | Trigger a transport order and wait for the result    |
+| `cancel_order`      | Cancel a transport order by correlation ID           |
 
 ## Behavior
 
@@ -46,6 +48,8 @@ The assistant understands natural language and:
 - Uses trigger_order when asked to move a box from one module to another
 - Avoids redundant tool use by reasoning from memory if the info was already retrieved
 - Tracks the correlation ID and waits for a real MQTT response
+- Uses cancel_order to stop an active transport and ignores the final result
+- Automatically republish a success: false result when cancellation is requested
 
 
 ## How It Works
@@ -57,6 +61,7 @@ The assistant understands natural language and:
    CALL find_last_order()
 
 4. The LLM chooses whether to call tools or answer from prior memory.
+5. Background listeners publish transport results and suppressed canceled orders.
 
 ## Example Questions
 
@@ -65,6 +70,7 @@ The assistant understands natural language and:
 - "List all the boxes"
 - "What was the last order executed?"
 - “Move the box 1 from conveyor_02 to container_01”
+- "Cancel the order with ID: abc123"
 
 
 
