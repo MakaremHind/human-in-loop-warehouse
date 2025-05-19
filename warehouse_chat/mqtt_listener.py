@@ -11,17 +11,17 @@ BROKER = "localhost"
 PORT = 1883
 
 TOPICS = [
-    "/inventory/boxes",
+    "inventory/boxes",
     "mmh_cam/detected_markers",
     "base_01/uarm_01",
     "base_01/uarm_02",
     "base_01/conveyor_02",
     "base_module_visualization",
     "height_map",
-    "/system/modules",
+    "system/modules",
     "layout/regions",
     "base_01/order_request",
-    "base_01/order_result"
+    "base_01/order_request/response"
 ]
 
 # Local in-memory cache for Envelope-type snapshots
@@ -59,7 +59,7 @@ client.loop_start()  # Non-blocking
 def get(topic: str):
     env = snapshots.get(topic)
     if env is None:
-        print(f"[DEBUG] ❌ Snapshot not found for topic: {topic}")
+        print(f"[DEBUG] Snapshot not found for topic: {topic}")
     else:
-        print(f"[DEBUG] ✅ Snapshot found for topic: {topic}")
+        print(f"[DEBUG] Snapshot found for topic: {topic}")
     return env

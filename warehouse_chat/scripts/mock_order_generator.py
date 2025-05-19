@@ -48,7 +48,7 @@ def main():
    
     order = generate_order()
     client.publish(TOPIC, json.dumps(order), qos=1)
-    print("✅ Published mock order to", TOPIC)
+    print("Published mock order to", TOPIC)
     
 
 if __name__ == "__main__":

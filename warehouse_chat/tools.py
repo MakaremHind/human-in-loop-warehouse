@@ -9,7 +9,7 @@ from snapshot_manager import snapshot_store
 BROKER = "localhost"
 PORT = 1883
 ORDER_REQUEST_TOPIC = "base_01/order_request"
-ORDER_RESULT_TOPIC = "base_01/order_result"
+ORDER_RESULT_TOPIC = "base_01/order_request/response"
 
 _order_results = {}
 _order_lock = threading.Lock()
@@ -119,7 +119,7 @@ def trigger_order(start: str, goal: str, color: str, box_id: int) -> dict:
     payload = {
         "header": {
             "timestamp": time.time(),
-            "sender_id": "OrderGenerator",  # ✅ match mock_order_generator
+            "sender_id": "OrderGenerator", 
             "correlation_id": correlation_id
         },
         "starting_module": {
@@ -139,7 +139,7 @@ def trigger_order(start: str, goal: str, color: str, box_id: int) -> dict:
         "cargo_box": {
             "id": box_id,
             "color": color,
-            "type": "small",  # You can make this smarter if needed
+            "type": "small", 
             "global_pose": {
                 "x": 0, "y": 0, "z": 0,
                 "roll": 0, "pitch": 0, "yaw": 0
@@ -152,18 +152,18 @@ def trigger_order(start: str, goal: str, color: str, box_id: int) -> dict:
     client.loop_start()
     client.publish(ORDER_REQUEST_TOPIC, json.dumps(payload), qos=1)
     client.disconnect()
-    print(f"[trigger_order] 📤 Published order to {ORDER_REQUEST_TOPIC}")
+    print(f"[trigger_order] Published order to {ORDER_REQUEST_TOPIC}")
 
-    # ⏳ Wait for result
+    # Wait for result
     for i in range(20):
-        print(f"[trigger_order] ⏳ Waiting for result... {correlation_id}")
+        print(f"[trigger_order] Waiting for result... {correlation_id}")
         time.sleep(0.5)
         with _order_lock:
             if correlation_id in _order_results:
                 result = _order_results.pop(correlation_id)
                 return {
                     "found": True,
-                    "success": result.get("success", False),
+                    "success": result.get("success", True),
                     "details": result
                 }
 

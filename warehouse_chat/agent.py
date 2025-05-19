@@ -70,7 +70,10 @@ def run_tool(state: Memory) -> Memory:
         pose = result["pose"]
         txt = f"Box {result['id']} ({result['color']}, {result['kind']}) is at x={pose['x']:.0f}, y={pose['y']:.0f}, z={pose['z']:.0f}."
     elif name == "trigger_order":
-        txt = "✅ Order triggered. " + ("Success!" if result.get("success") else "Failed.")
+        # Let the LLM generate the reply naturally
+        state["messages"].append(AIMessage(content=json.dumps(result)))
+        return llm_node(state)
+
     elif name == "find_last_order":
         order = result["order"]
         txt = f"Last order:\n- From: {order['starting_module']['namespace']}\n- To: {order['goal']['namespace']}\n- Cargo: {order['cargo_box']['color']} {order['cargo_box']['type']} box (ID {order['cargo_box']['id']})"

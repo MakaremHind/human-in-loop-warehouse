@@ -93,7 +93,7 @@ def normalize_message(raw: Dict) -> Envelope:
         ]}
 
     elif "starting_module" in raw and "goal" in raw and "cargo_box" in raw:
-        # ✅ This is the actual order result
+        # This is the actual order result
         env["type"] = "OrderResult"
         env["data"] = {"order": {
             "starting_module": raw["starting_module"],
@@ -102,7 +102,7 @@ def normalize_message(raw: Dict) -> Envelope:
         }}
 
     elif "success" in raw and "info" in raw:
-        # ✅ This is just a completion response — ignore it silently
+        # This is just a completion response — ignore it silently
         raise ValueError("Order completion status message ignored.")
 
     else:
