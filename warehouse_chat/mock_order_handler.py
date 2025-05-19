@@ -13,7 +13,7 @@ def simulate_transport(order_msg):
     order = json.loads(order_msg)
     print(f"[Mock Handler] Received order: {order}")
     print("[Mock Handler] Simulating transport...")
-    time.sleep(5)  # Simulate delay
+    time.sleep(50)  # Simulate delay
 
     # Construct compatible response format
     response = {

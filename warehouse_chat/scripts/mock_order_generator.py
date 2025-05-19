@@ -48,6 +48,7 @@ def main():
    
     order = generate_order()
     client.publish(TOPIC, json.dumps(order), qos=1)
+    client.loop(2)  # Allow time for message to be sent
     print("Published mock order to", TOPIC)
     
 

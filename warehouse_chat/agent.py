@@ -1,4 +1,3 @@
-# agent.py
 import os, re, json, logging
 from typing_extensions import TypedDict, Annotated
 from langgraph.graph import StateGraph
@@ -29,28 +28,26 @@ BASE_PROMPT = (
     "- find_module(namespace:str)\n"
     "- list_boxes()                  → summary only (NO pose)\n"
     "- find_last_order()             → recent order summary\n"
-    "- trigger_order(start:str, goal:str, color:str, box_id:int)\n\n"
+    "- trigger_order(start:str, goal:str, color:str, box_id:int)\n"
+    "- cancel_order(correlation_id:str)  → stop awaiting a running transport\n\n"
     "If the user says: move box 3 from conveyor_02 to container_01,\n"
     "plan the needed tool calls and then execute them step by step.\n"
 )
 
-# ───────── LLM node ─────────
 def llm_node(state: Memory) -> Memory:
     facts = [msg.content for msg in state["messages"] if isinstance(msg, AIMessage) and not msg.content.startswith("CALL")]
     system_prompt = AIMessage(role="system", content=BASE_PROMPT + "\n\nHere’s what you know so far:\n" + "\n".join(facts[-5:]))
     response = llm.invoke([system_prompt, *state["messages"]])
     return {"messages": state["messages"] + [response]}
 
-# ───────── Match tool calls ─────────
 CALL_RE = re.compile(r"\bCALL\s+(\w+)(?:\s+(\{[^{}]*\}))?", re.S)
 
-# ───────── Tool runner ─────────
 def run_tool(state: Memory) -> Memory:
     msg = state["messages"][-1].content
     match = CALL_RE.search(msg)
     if not match:
         return {"messages": state["messages"] + [AIMessage(content="Tool call not understood.")]}
-    
+
     name, js = match.groups()
     args = json.loads(js) if js else {}
 
@@ -70,10 +67,11 @@ def run_tool(state: Memory) -> Memory:
         pose = result["pose"]
         txt = f"Box {result['id']} ({result['color']}, {result['kind']}) is at x={pose['x']:.0f}, y={pose['y']:.0f}, z={pose['z']:.0f}."
     elif name == "trigger_order":
-        # Let the LLM generate the reply naturally
         state["messages"].append(AIMessage(content=json.dumps(result)))
         return llm_node(state)
 
+    elif name == "cancel_order":
+        txt = result["message"] if result.get("found") else result.get("error", "Unknown error.")
     elif name == "find_last_order":
         order = result["order"]
         txt = f"Last order:\n- From: {order['starting_module']['namespace']}\n- To: {order['goal']['namespace']}\n- Cargo: {order['cargo_box']['color']} {order['cargo_box']['type']} box (ID {order['cargo_box']['id']})"
@@ -82,23 +80,23 @@ def run_tool(state: Memory) -> Memory:
 
     return {"messages": state["messages"] + [AIMessage(content=txt)]}
 
-# ───────── Planner: expand multi-step commands ─────────
+
 def planner_node(state: Memory) -> Memory:
     planner_prompt = AIMessage(role="system", content=BASE_PROMPT + "\n\nPlan your tool calls step-by-step.")
     response = llm.invoke([planner_prompt, *state["messages"]])
     return {"messages": state["messages"] + [response]}
 
-# ───────── Routing ─────────
 def router(state: Memory) -> str:
     last = state["messages"][-1].content
     if "CALL" in last:
         return "tool"
     elif any(k in last.lower() for k in ["move box", "transfer box", "transport"]):
         return "planner"
+    elif any(k in last.lower() for k in ["cancel order", "stop order"]):
+        return "planner"
     else:
         return "end"
 
-# ───────── LangGraph wiring ─────────
 graph = StateGraph(Memory)
 graph.add_node("llm", llm_node)
 graph.add_node("tool", RunnableLambda(run_tool))

@@ -1,7 +1,7 @@
-# main.py
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from agent import agent
 import mqtt_listener  # ensures MQTT listener is running
+from tools import result_messages
 
 # Chat history persists through turns
 chat_history = []
@@ -21,8 +21,17 @@ while True:
     # Run agent with current input and conversation history
     state = agent.invoke({"messages": chat_history + [HumanMessage(content=user_input)]})
     reply = state["messages"][-1]
-
     print("Bot:", reply.content)
 
     # Save the latest turn
     chat_history.extend([HumanMessage(content=user_input), reply])
+
+    # ✅ Inject background result messages, if any
+    while result_messages:
+        result = result_messages.pop(0)
+        summary = (
+            f"✅ Order {result['correlation_id']} finished. "
+            f"{'Success ✅' if result['success'] else 'Failed ❌'}."
+        )
+        print("Bot:", summary)
+        chat_history.append(AIMessage(content=summary))
