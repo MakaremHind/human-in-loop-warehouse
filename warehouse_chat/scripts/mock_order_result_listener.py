@@ -1,7 +1,7 @@
 import paho.mqtt.client as mqtt
 import json
 
-BROKER = "localhost"
+BROKER = "192.168.50.100"
 PORT = 1883
 TOPIC = "base_01/order_request/response"
 

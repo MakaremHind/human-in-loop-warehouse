@@ -7,7 +7,7 @@ from langchain_core.runnables import RunnableLambda
 from langchain_ollama import ChatOllama
 from tools import ALL_TOOLS
 
-logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.ERROR)
 
 MODEL = os.getenv("OLLAMA_MODEL", "qwen3:latest")
 llm = ChatOllama(model=MODEL, temperature=0.0)
@@ -56,29 +56,61 @@ def run_tool(state: Memory) -> Memory:
             result = tool.invoke(args)
             break
     else:
-        return {"messages": state["messages"] + [AIMessage(content=f"Unknown tool {name}")]}
+        return {"messages": state["messages"] + [AIMessage(content=f"Unknown tool `{name}`")]}
 
-    logging.info("🛠 Tool '%s' result: %s", name, result)
+    logging.info("Tool '%s' result: %s", name, result)
 
+    # Error case
     if isinstance(result, dict) and not result.get("found"):
-        return {"messages": state["messages"] + [AIMessage(content=result["error"])]}
+        return {"messages": state["messages"] + [AIMessage(content=result.get("error", f"{name} failed."))]}
 
+    # Interpret results
     if name in {"find_box", "find_box_by_color"}:
         pose = result["pose"]
-        txt = f"Box {result['id']} ({result['color']}, {result['kind']}) is at x={pose['x']:.0f}, y={pose['y']:.0f}, z={pose['z']:.0f}."
+        txt = (
+            f"Box {result['id']} ({result['color']}, {result['kind']}) "
+            f"is at x={pose['x']:.0f}, y={pose['y']:.0f}, z={pose['z']:.0f}."
+        )
+
+    elif name == "find_module":
+        pose = result["pose"]
+        txt = (
+            f"🔧 Module `{result['namespace']}` is located at "
+            f"x={pose['x']:.0f}, y={pose['y']:.0f}, z={pose['z']:.0f}."
+        )
+
     elif name == "trigger_order":
-        state["messages"].append(AIMessage(content=json.dumps(result)))
-        return llm_node(state)
+        cid = result.get("correlation_id", "<unknown>")
+        txt = (
+            f"Order has been dispatched!\n"
+            f"- ID: `{cid}`\n"
+            f"- I’ll let you know when the result arrives."
+        )
 
     elif name == "cancel_order":
-        txt = result["message"] if result.get("found") else result.get("error", "Unknown error.")
+        if result.get("found"):
+            txt = (
+                f"Order `{args.get('correlation_id')}` has been cancelled. "
+                "I'll ignore its result if it comes in later."
+            )
+        else:
+            txt = result.get("error", "Could not cancel the order.")
+
     elif name == "find_last_order":
         order = result["order"]
-        txt = f"Last order:\n- From: {order['starting_module']['namespace']}\n- To: {order['goal']['namespace']}\n- Cargo: {order['cargo_box']['color']} {order['cargo_box']['type']} box (ID {order['cargo_box']['id']})"
+        txt = (
+            "Last completed order:\n"
+            f"- From: {order['starting_module']['namespace']}\n"
+            f"- To:   {order['goal']['namespace']}\n"
+            f"- Cargo: {order['cargo_box']['color']} {order['cargo_box']['type']} box "
+            f"(ID {order['cargo_box']['id']})"
+        )
+
     else:
         txt = json.dumps(result)
 
     return {"messages": state["messages"] + [AIMessage(content=txt)]}
+
 
 
 def planner_node(state: Memory) -> Memory:
@@ -104,7 +136,7 @@ graph.add_node("planner", planner_node)
 graph.set_entry_point("llm")
 graph.add_conditional_edges("llm", router)
 graph.add_edge("planner", "llm")
-graph.add_edge("tool", "llm")
+#graph.add_edge("tool", "llm")
 graph.set_finish_point("llm")
 
 agent = graph.compile()

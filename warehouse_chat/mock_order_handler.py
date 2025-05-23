@@ -3,7 +3,7 @@ import json
 import time
 import paho.mqtt.client as mqtt
 
-BROKER = "localhost"
+BROKER = "192.168.50.100"
 PORT = 1883
 
 REQUEST_TOPIC = "base_01/order_request"
@@ -19,9 +19,9 @@ def simulate_transport(order_msg):
     response = {
         "header": {
             "timestamp": time.time(),
-            "module_id": "mock_handler",
+            "module_id": 10,
             "correlation_id": order["header"]["correlation_id"],
-            "version": 1.0
+            "version": 1
         },
         "success": True
     }

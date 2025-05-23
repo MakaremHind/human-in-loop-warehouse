@@ -28,6 +28,6 @@ order_result = {
     }
 }
 
-client.publish("/base_01/order_result", json.dumps(order_result), qos=1)
+client.publish("base_01/order_request/response", json.dumps(order_result), qos=1)
 print("[✔] Published order result.")
 client.disconnect()
