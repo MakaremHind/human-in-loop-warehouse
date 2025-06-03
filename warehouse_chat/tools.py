@@ -2,10 +2,9 @@
 
 from typing import Dict, Any
 import logging, json, time, uuid, threading
-
 import paho.mqtt.client as mqtt
 from langchain_core.tools import tool
-
+from models import Envelope, normalize_message
 from mqtt_listener import get
 from snapshot_manager import snapshot_store   # keeps type checkers happy
 
@@ -134,12 +133,18 @@ def find_module(namespace: str):
 
 
 @tool
-def find_last_order():
-    """Return the payload of the most recently finished order (if any)."""
-    if not _order_results:
-        return {"found": False, "error": "No order results yet"}
-    cid = sorted(_order_results.keys())[-1]
-    return {"found": True, "order": _order_results[cid]}
+def find_last_order(args: dict = {}) -> dict:
+    """Returns the most recently completed order from the warehouse."""
+    topic = "base_01/order_request"
+    data = snapshot_store.get(topic)
+    if not data:
+        return {"found": False, "error": "No recent order found."}
+
+    try:
+        env = normalize_message(data)
+        return {"found": True, "order": env.data["order"]}
+    except Exception as e:
+        return {"found": False, "error": f"Failed to normalize order: {e}"}
 
 @tool(args_schema={
     "start": str,

@@ -136,7 +136,7 @@ graph.add_node("planner", planner_node)
 graph.set_entry_point("llm")
 graph.add_conditional_edges("llm", router)
 graph.add_edge("planner", "llm")
-#graph.add_edge("tool", "llm")
+graph.add_edge("tool", "llm")
 graph.set_finish_point("llm")
 
 agent = graph.compile()
