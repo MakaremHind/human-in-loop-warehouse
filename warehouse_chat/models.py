@@ -62,22 +62,30 @@ def normalize_message(raw: Dict) -> Envelope:
 
     if "boxes" in raw:
         env["type"] = "BoxArray"
-        env["data"] = {"items": [
-            {"id": b["id"],
-             "color": b["color"],
-             "kind": b["type"],
-             "pose": b["global_pose"]}
-            for b in raw["boxes"]
-        ]}
+        env["data"] = {
+            "boxes": [  # 🔄 use "boxes" instead of "items"
+                {
+                    "id": b["id"],
+                    "color": b["color"],
+                    "type": b["type"],           # keep "type" instead of "kind" to match original
+                    "pose": b["global_pose"]
+                }
+                for b in raw["boxes"]
+            ]
+        }
 
     elif "fiducials" in raw:
         env["type"] = "FiducialArray"
-        env["data"] = {"items": [
-            {"id": f["id"],
-             "type": f["type"],
-             "pose": f["relative_pose"]}
-            for f in raw["fiducials"]
-        ]}
+        env["data"] = {
+            "items": [
+                {
+                    "id": f["id"],
+                    "type": f["type"],
+                    "pose": f["relative_pose"]
+                }
+                for f in raw["fiducials"]
+            ]
+        }
 
     elif "modules" in raw:
         env["type"] = "ModulePoseArray"
@@ -85,24 +93,28 @@ def normalize_message(raw: Dict) -> Envelope:
 
     elif "map" in raw:
         env["type"] = "RegionArray"
-        env["data"] = {"items": [
-            {"top_corner": r["TopCorner"],
-             "bottom_corner": r["BottomCorner"],
-             "height": r["height"]}
-            for r in raw["map"]
-        ]}
+        env["data"] = {
+            "items": [
+                {
+                    "top_corner": r["TopCorner"],
+                    "bottom_corner": r["BottomCorner"],
+                    "height": r["height"]
+                }
+                for r in raw["map"]
+            ]
+        }
 
     elif "starting_module" in raw and "goal" in raw and "cargo_box" in raw:
-        # ✅ This is the actual order result
         env["type"] = "OrderResult"
-        env["data"] = {"order": {
-            "starting_module": raw["starting_module"],
-            "goal": raw["goal"],
-            "cargo_box": raw["cargo_box"]
-        }}
+        env["data"] = {
+            "order": {
+                "starting_module": raw["starting_module"],
+                "goal": raw["goal"],
+                "cargo_box": raw["cargo_box"]
+            }
+        }
 
     elif "success" in raw and "info" in raw:
-        # ✅ This is just a completion response — ignore it silently
         raise ValueError("Order completion status message ignored.")
 
     else:

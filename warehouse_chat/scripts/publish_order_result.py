@@ -4,7 +4,7 @@ import json
 from uuid import uuid4
 
 client = mqtt.Client()
-client.connect("localhost", 1883, 60)
+client.connect("192.168.50.100", 1883, 60)
 
 order_result = {
     "header": {
@@ -28,6 +28,6 @@ order_result = {
     }
 }
 
-client.publish("/base_01/order_result", json.dumps(order_result), qos=1)
+client.publish("base_01/order_request/response", json.dumps(order_result), qos=1)
 print("[✔] Published order result.")
 client.disconnect()

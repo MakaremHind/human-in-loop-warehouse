@@ -1,6 +1,7 @@
-langchain-core==0.3.58
-langgraph==0.0.40
-langchain-ollama==0.3.2
-paho-mqtt==2.0.0
-pydantic==2.11.4
-typing-extensions==4.13.2
+langchain
+langchain-core
+langgraph
+langchain-ollama
+paho-mqtt
+pydantic
+typing-extensions

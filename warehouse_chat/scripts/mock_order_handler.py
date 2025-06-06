@@ -3,38 +3,36 @@ import json
 import time
 import paho.mqtt.client as mqtt
 
-BROKER = "localhost"
+BROKER = "192.168.50.100"
 PORT = 1883
 
 REQUEST_TOPIC = "base_01/order_request"
-RESULT_TOPIC = "base_01/order_result"
+RESULT_TOPIC = "base_01/order_request/response"
 
 def simulate_transport(order_msg):
     order = json.loads(order_msg)
-    print(f"[Mock Handler] 📨 Received order: {order}")
-    print("[Mock Handler] 🚚 Simulating transport...")
-    time.sleep(5)  # Simulate delay
+    print(f"[Mock Handler] Received order: {order}")
+    print("[Mock Handler] Simulating transport...")
+    time.sleep(50)  # Simulate delay
 
     # Construct compatible response format
     response = {
         "header": {
             "timestamp": time.time(),
-            "module_id": "mock_handler",
+            "module_id": 10,
             "correlation_id": order["header"]["correlation_id"],
-            "version": 1.0
+            "version": 1
         },
-        "starting_module": order["starting_module"],
-        "goal": order["goal"],
-        "cargo_box": order["cargo_box"]
+        "success": True
     }
 
     return json.dumps(response)
 
 def on_message(client, userdata, msg):
-    print(f"[Mock Handler] 📩 Message on topic: {msg.topic}")
+    print(f"[Mock Handler] Message on topic: {msg.topic}")
     response = simulate_transport(msg.payload.decode())
     client.publish(RESULT_TOPIC, response, qos=1)
-    print(f"[Mock Handler] ✅ Published result to {RESULT_TOPIC}")
+    print(f"[Mock Handler] Published result to {RESULT_TOPIC}")
 
 def main():
     client = mqtt.Client()
