@@ -10,8 +10,8 @@ BROKER = "192.168.50.100"
 PORT = 1883
 
 TOPICS = [
-    "inventory/boxes",
     "mmh_cam/detected_markers",
+    "mmh_cam/detected_boxes",
     "base_01/uarm_01",
     "base_01/uarm_02",
     "base_01/conveyor_02",
@@ -21,7 +21,12 @@ TOPICS = [
     "layout/regions",
     "base_01/order_request",
     "base_01/order_request/response/#",
-    "base_01/order_request/response"
+    "base_01/order_request/response",
+    "base_01/uarm_01/transport/response",
+    "master/logs/execute_planned_path/info",
+    "master/logs/execute_planned_path/debug",
+    "master/logs/execute_planned_path/warning",
+    "master/logs/search_for_box_in_starting_module_workspace/warning"
 ]
 
 # Local in-memory cache for Envelope-type snapshots
@@ -70,3 +75,5 @@ def get(topic: str):
     else:
         print(f"[DEBUG] Snapshot found for topic: {topic}")
     return env
+
+

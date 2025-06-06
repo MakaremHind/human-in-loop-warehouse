@@ -28,10 +28,13 @@ BASE_PROMPT = (
     "- find_module(namespace:str)\n"
     "- list_boxes()                  → summary only (NO pose)\n"
     "- find_last_order()             → recent order summary\n"
+    "- diagnose_failure()         → explain why the last order failed\n"
     "- trigger_order(start:str, goal:str, color:str, box_id:int)\n"
     "- cancel_order(correlation_id:str)  → stop awaiting a running transport\n\n"
     "If the user says: move box 3 from conveyor_02 to container_01,\n"
     "plan the needed tool calls and then execute them step by step.\n"
+    "If you have no extra insight, just repeat the last observation as the answer.\n"
+    
 )
 
 def llm_node(state: Memory) -> Memory:
@@ -105,6 +108,8 @@ def run_tool(state: Memory) -> Memory:
             f"- Cargo: {order['cargo_box']['color']} {order['cargo_box']['type']} box "
             f"(ID {order['cargo_box']['id']})"
         )
+    elif name == "diagnose_last_failure":
+        txt = (f"Diagnosis of last failure:- Correlation ID: {result.get('correlation_id')} - Reason: {result.get('reason')}")
 
     else:
         txt = json.dumps(result)
@@ -126,6 +131,8 @@ def router(state: Memory) -> str:
         return "planner"
     elif any(k in last.lower() for k in ["cancel order", "stop order"]):
         return "planner"
+    elif any(k in last.lower() for k in ["diagnose", "reason", "why", "failed", "failure"]):
+        return "planner"
     else:
         return "end"
 
@@ -137,6 +144,6 @@ graph.set_entry_point("llm")
 graph.add_conditional_edges("llm", router)
 graph.add_edge("planner", "llm")
 graph.add_edge("tool", "llm")
-graph.set_finish_point("llm")
+graph.set_finish_point("tool")
 
 agent = graph.compile()

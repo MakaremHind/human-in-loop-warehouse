@@ -1,11 +1,10 @@
-from langchain_core.messages import HumanMessage, AIMessage
-from agent import agent
-import mqtt_listener  # ensures MQTT listener is running
+# main.py
+import mqtt_listener 
+from langchain_core.messages import HumanMessage
+from react_agent import agent             # <<< NEW IMPORT
 from snapshot_manager import snapshot_store
-import time
-import json
+import time, json
 
-# Chat history persists through turns
 chat_history = []
 
 print("[Chat] Type 'quit' to exit.")
@@ -20,34 +19,25 @@ while True:
         print("[Chat] Goodbye!")
         break
 
-    # Run agent with current input and conversation history
-    state = agent.invoke({"messages": chat_history + [HumanMessage(content=user_input)]})
-    reply = state["messages"][-1]
-    print("Bot:", reply.content)
+    # --- run ReAct agent (no state object needed) ---------
+    reply = agent.invoke({"input": user_input})["output"]
+    print("Bot:", reply)
+    chat_history.append((user_input, reply))
 
-    # Save the latest turn
-    chat_history.extend([HumanMessage(content=user_input), reply])
-
-    # ⏳ Check for triggered order to watch for a result
+    # --- (optional) same watcher you had before ----------
     try:
-        data = json.loads(reply.content)
-        correlation_id = data.get("correlation_id")
-        if correlation_id:
-            print(f"[Watcher] Waiting for result of order ID {correlation_id}...")
-
-            # Poll for up to 20 seconds
+        data = json.loads(reply)
+        cid = data.get("correlation_id")
+        if cid:
+            print(f"[Watcher] Waiting for result of order ID {cid}…")
             for _ in range(20):
-                snapshot = snapshot_store.get("base_01/order_request/response")
-                if snapshot:
-                    header = snapshot.get("header", {})
-                    if header.get("correlation_id") == correlation_id:
-                        success = snapshot.get("success", False)
-                        result_msg = f"Order {correlation_id} finished. {' Success' if success else ' Failed'}."
-                        print("Bot:", result_msg)
-                        chat_history.append(AIMessage(content=result_msg))
-                        break
+                snap = snapshot_store.get("base_01/order_request/response")
+                if snap and snap.get("header", {}).get("correlation_id") == cid:
+                    succ = snap.get("success", False)
+                    print("Bot:", f"Order {cid} finished. {'Success' if succ else 'Failed'}.")
+                    break
                 time.sleep(1)
             else:
                 print("Bot: Timed out waiting for order result.")
     except Exception:
-        pass  # Not a JSON trigger_order response
+        pass

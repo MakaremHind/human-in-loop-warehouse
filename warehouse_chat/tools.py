@@ -7,6 +7,7 @@ from langchain_core.tools import tool
 from models import Envelope, normalize_message
 from mqtt_listener import get
 from snapshot_manager import snapshot_store   # keeps type checkers happy
+from typing import List
 
 
 # MQTT CONFIG
@@ -76,37 +77,50 @@ def _start_result_listener():
 # TOOL DEFINITIONS
 @tool
 def list_boxes() -> list:
-    """Return `[id, color, kind]` for every visible box (without pose)."""
-    env = get("inventory/boxes")
+    """Return `[id, color, type]` for every detected box (no pose)."""
+    env = get("mmh_cam/detected_boxes")
     if not env:
         return []
-    return [{"id": b["id"], "color": b["color"], "kind": b["kind"]}
-            for b in env.data["items"]]
+    return [{"id": i, "color": b["color"], "type": b["type"]}
+            for i, b in enumerate(env.data["boxes"])]
 
 @tool(args_schema={"box_id": int})
 def find_box(box_id: int):
-    """Find a box by numeric id and return its pose and attributes."""
-    env = get("inventory/boxes")
-    if not env:
+    """Find a box by index in the list and return full box data including pose."""
+    env = get("mmh_cam/detected_boxes")
+    if not env or not env.data["boxes"]:
         return _nf("box", box_id)
-    for b in env.data["items"]:
-        if b["id"] == box_id:
-            return {"found": True, **b}
+    if 0 <= box_id < len(env.data["boxes"]):
+        return {"found": True, **env.data["boxes"][box_id]}
     return _nf("box", box_id)
 
 @tool(args_schema={"color": str})
 def find_box_by_color(color: str):
     """
-    Return the first box whose `color` field matches the given value.
-    If no such box exists, `found` will be False.
+    Return the first box with matching color.
+    If none found, returns `found: False`.
     """
-    env = get("inventory/boxes")
-    if not env:
+    env = get("mmh_cam/detected_boxes")
+    if not env or not env.data["boxes"]:
         return _nf("box(color)", color)
-    for b in env.data["items"]:
-        if b["color"] == color:
+    for b in env.data["boxes"]:
+        if b["color"].lower() == color.lower():
             return {"found": True, **b}
     return _nf("box(color)", color)
+
+@tool
+def list_modules() -> List[str]:
+    """Returns the list of all available module namespaces (e.g., conveyors, containers, docks, etc.)"""
+    snapshot = get("base_01/base_module_visualization")
+    if not snapshot:
+        return []
+
+    # Accept normalized or raw format
+    modules = (
+        snapshot.data.get("items")
+        or snapshot.data.get("modules", [])
+    )
+    return [m["namespace"] for m in modules if "namespace" in m]
 
 @tool(args_schema={"namespace": str})
 def find_module(namespace: str):
@@ -255,7 +269,7 @@ def cancel_order(correlation_id: str):
         "found": True,
         "message": "Order canceled; future result ignored and failure response sent."
     }
-    
+      
 @tool
 def confirm_last_order():
     """Report whether the most recently received order succeeded or failed."""
@@ -273,6 +287,63 @@ def confirm_last_order():
     return {"found": True, "message": msg}
 
 
+# === Updated diagnose_failure tool ===
+from langchain_core.tools import tool
+from mqtt_listener import get
+from snapshot_manager import snapshot_store
+
+@tool
+def diagnose_failure() -> dict:
+    """
+    Diagnose the reason for a failed order by scanning relevant MQTT log topics,
+    regardless of correlation ID.
+
+    It checks:
+    - `base_01/*/transport/response` for success=false
+    - `master/logs/execute_planned_path` for module execution failures
+    - `master/logs/search_for_box_in_starting_module_workspace` for missing boxes
+    """
+
+    reasons = []
+
+    for topic, payload in snapshot_store.snapshots.items():
+        if not isinstance(payload, dict):
+            continue
+
+        msg = json.dumps(payload)
+
+        # --- Topic-specific failure indicators ------------------------
+
+        if "base_01/" in topic and topic.endswith("/transport/response"):
+            if not payload.get("success", True):
+                reasons.append(f"Transport failure reported in {topic}.")
+
+        elif topic == "master/logs/execute_planned_path":
+            message = payload.get("message", "")
+            if "Transport failed" in message:
+                reasons.append("Transport failed at a module during execution.")
+
+        elif topic == "master/logs/search_for_box_in_starting_module_workspace":
+            message = payload.get("message", "")
+            if "No box found" in message:
+                reasons.append("No box found in starting module workspace.")
+
+    # collapse duplicates
+    seen = set()
+    unique_reasons = [r for r in reasons if not (r in seen or seen.add(r))]
+
+    if not unique_reasons:
+        return {
+            "found": False,
+            "error": "No known failure messages found in relevant topics."
+        }
+
+    return {
+        "found": True,
+        "reason": "; ".join(unique_reasons)
+    }
+
+
 # PUBLIC EXPORT
 ALL_TOOLS = [
     find_box,
@@ -282,8 +353,113 @@ ALL_TOOLS = [
     find_last_order,
     trigger_order,
     cancel_order,
-    confirm_last_order
+    confirm_last_order,
+    diagnose_failure,
+    list_modules,
 ]
 
 # Default log level
 logging.getLogger().setLevel(logging.INFO)
+
+# ────────── SINGLE-STRING WRAPPERS for MRKL agent ──────────
+from typing import Any, Dict
+from langchain.agents import Tool
+
+def _parse_kv(arg: str) -> Dict[str, str]:
+    result = {}
+    for part in arg.split(","):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            v = v.strip().strip('"').strip("'")  # removes surrounding quotes
+            result[k.strip()] = v
+    return result
+
+
+
+# ---- helpers that accept *either* string or dict -----------
+def _ensure_dict(inp: Any) -> Dict[str, Any]:
+    if isinstance(inp, dict):
+        return inp
+    if isinstance(inp, str):
+        inp = inp.strip()
+        try:
+            return json.loads(inp)           # allow raw JSON
+        except json.JSONDecodeError:
+            if "=" in inp:
+                return _parse_kv(inp)        # "a=1,b=2" style
+            else:
+                return {"namespace": inp}    # plain strings (e.g. "uarm_01")
+    raise ValueError("Unsupported input type")
+
+
+# ---------- one wrapper per original tool -------------------
+def find_box_wrap(arg: Any):
+    if isinstance(arg, int):
+        d = {"box_id": arg}
+    elif isinstance(arg, str) and arg.strip().isdigit():
+        d = {"box_id": int(arg.strip())}
+    else:
+        d = _ensure_dict(arg)
+        d["box_id"] = int(d["box_id"])  # ensure int
+    return find_box.invoke(d)
+
+def find_box_by_color_wrap(arg: Any):
+    d = _ensure_dict(arg)
+    if "color" not in d and arg:
+        d = {"color": str(arg).strip()}
+    return find_box_by_color.invoke(d)
+
+def find_module_wrap(arg: Any):
+    d = _ensure_dict(arg)
+    if "namespace" not in d and arg:
+        d = {"namespace": str(arg).strip()}
+    return find_module.invoke(d)
+
+def trigger_order_wrap(arg: Any):
+    d = _ensure_dict(arg)
+    required = {"start", "goal", "color", "box_id"}
+    if not required.issubset(d):
+        raise ValueError(f"trigger_order expects {required}")
+    d["box_id"] = int(d["box_id"])
+    print("[DEBUG] Parsed trigger_order args:", d)
+    return trigger_order.invoke(d)
+
+def cancel_order_wrap(arg: Any):
+    d = _ensure_dict(arg)
+    cid = d.get("correlation_id", str(arg).strip())
+    return cancel_order.invoke({"correlation_id": cid})
+
+def diagnose_failure_wrap(_: Any = ""):
+    return diagnose_failure.invoke({})
+
+
+# tools without args
+list_boxes_wrap        = lambda _="": list_boxes.invoke({})
+find_last_order_wrap   = lambda _="": find_last_order.invoke({})
+confirm_last_order_wrap= lambda _="": confirm_last_order.invoke({})
+
+# ---------- MRKL-compatible toolkit -------------------------
+MRKL_TOOLS = [
+    Tool("find_box",           find_box_wrap,
+         "find_box(box_id:int)  → pose & attributes"),
+    Tool("find_box_by_color",  find_box_by_color_wrap,
+         "find_box_by_color(color:str)"),
+    Tool("find_module",        find_module_wrap,
+         "find_module(namespace:str)"),
+    Tool("list_boxes",         list_boxes_wrap,
+         "list_boxes() → summary of boxes"),
+    Tool("find_last_order",    find_last_order_wrap,
+         "find_last_order() → last completed order"),
+    Tool("trigger_order",      trigger_order_wrap,
+         ("trigger_order(start:str, goal:str, color:str, "
+          "box_id:int) → dispatch order")),
+    Tool("cancel_order",       cancel_order_wrap,
+         "cancel_order(correlation_id:str)"),
+    Tool("confirm_last_order", confirm_last_order_wrap,
+         "confirm_last_order() → success / failed"),
+    Tool("diagnose_failure", diagnose_failure_wrap,
+     "diagnose_failure() → reason for last known failure"),
+    Tool("list_modules", lambda _="": list_modules.invoke({}),
+         "list_modules() → all available module namespaces"),
+]
+
