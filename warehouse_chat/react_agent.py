@@ -32,8 +32,10 @@ agent = initialize_agent(
     handle_parsing_errors=True,
     agent_kwargs={
         "prefix": """You are a helpful warehouse assistant. Your job is to manage boxes, modules, orders, and logistics. 
-You must use tools like list_boxes, find_box, and trigger_order to reason about the current inventory and execute user commands precisely.""",
-        "suffix": """Begin. Remember to reason step by step. and don't trigger an order unless the user explicitly asks for it.
+You must use tools like list_boxes, find_box, and trigger_order to reason about the current inventory and execute user commands precisely.
+You should call **master_status** always before calling any tool to decide whether the Master controller is
+currently online""",
+        "suffix": """Begin. Remember to reason step by step. and don't trigger an order unless the user explicitly asks for it and whem triggering an order don't look for a box or call find box function only the modules are matter.
 Question: {input}
 {agent_scratchpad}"""
     }

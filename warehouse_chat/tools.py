@@ -8,6 +8,9 @@ from models import Envelope, normalize_message
 from mqtt_listener import get
 from snapshot_manager import snapshot_store   # keeps type checkers happy
 from typing import List
+from mqtt_listener import BROKER_CONNECTED, LAST_MASTER_MSG
+ONLINE_TIMEOUT = 30.0      # seconds without a master message → “offline”
+
 
 
 # MQTT CONFIG
@@ -38,7 +41,23 @@ def _iter_modules():
     )
 
 
+@tool
+def master_status() -> dict:
+    """
+    Return {'online': bool, 'since': <seconds>} telling whether the Master
+    controller appears alive (based on recent MQTT traffic under 'master/…').
+    """
+    if not BROKER_CONNECTED:
+        return {"online": False, "since": None,
+                "info": "MQTT broker unreachable"}
 
+    age = time.time() - LAST_MASTER_MSG
+    return {
+        "online": age < ONLINE_TIMEOUT,
+        "since" : round(age, 1)          # age of last heartbeat
+    }
+    
+    
 def _pose_from_module(namespace: str):
     modules = _iter_modules()
     print(f"[DEBUG] Looking for module '{namespace}' in {[m['namespace'] for m in modules]}")
@@ -356,6 +375,7 @@ ALL_TOOLS = [
     confirm_last_order,
     diagnose_failure,
     list_modules,
+    master_status
 ]
 
 # Default log level
@@ -368,13 +388,14 @@ from langchain.agents import Tool
 def _parse_kv(arg: str) -> Dict[str, str]:
     result = {}
     for part in arg.split(","):
-        if "=" in part:
+        if ":" in part:
+            k, v = part.split(":", 1)
+        elif "=" in part:
             k, v = part.split("=", 1)
-            v = v.strip().strip('"').strip("'")  # removes surrounding quotes
-            result[k.strip()] = v
+        else:
+            continue
+        result[k.strip()] = v.strip().strip('"').strip("'")
     return result
-
-
 
 # ---- helpers that accept *either* string or dict -----------
 def _ensure_dict(inp: Any) -> Dict[str, Any]:
@@ -383,25 +404,24 @@ def _ensure_dict(inp: Any) -> Dict[str, Any]:
     if isinstance(inp, str):
         inp = inp.strip()
         try:
-            return json.loads(inp)           # allow raw JSON
+            return json.loads(inp)
         except json.JSONDecodeError:
-            if "=" in inp:
-                return _parse_kv(inp)        # "a=1,b=2" style
+            if "=" in inp or ":" in inp:
+                return _parse_kv(inp)
             else:
-                return {"namespace": inp}    # plain strings (e.g. "uarm_01")
+                return {"namespace": inp}
     raise ValueError("Unsupported input type")
+
 
 
 # ---------- one wrapper per original tool -------------------
 def find_box_wrap(arg: Any):
-    if isinstance(arg, int):
-        d = {"box_id": arg}
-    elif isinstance(arg, str) and arg.strip().isdigit():
-        d = {"box_id": int(arg.strip())}
-    else:
-        d = _ensure_dict(arg)
-        d["box_id"] = int(d["box_id"])  # ensure int
+    d = _ensure_dict(arg)
+    if "box_id" not in d:
+        raise ValueError("find_box expects box_id:int, but none was provided.")
+    d["box_id"] = int(d["box_id"])  # ensure int
     return find_box.invoke(d)
+
 
 def find_box_by_color_wrap(arg: Any):
     d = _ensure_dict(arg)
@@ -461,5 +481,7 @@ MRKL_TOOLS = [
      "diagnose_failure() → reason for last known failure"),
     Tool("list_modules", lambda _="": list_modules.invoke({}),
          "list_modules() → all available module namespaces"),
+    Tool("master_status", lambda _="": master_status.invoke({}),
+         "master_status() → is the master online?")
 ]
 

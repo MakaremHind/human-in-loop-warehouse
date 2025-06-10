@@ -16,16 +16,25 @@ custom_css = """
 /* push title below the two logos */
 #title {margin-top:80px;}
 /* simple emphasis for typing banner */
-#typing {font-style:italic; color:#666;}
 """
 
 # ─────────────────────────── agent wrappers ───────────────────────────────
 def agent_reply(user_msg: str, history: list):
-    """Call the LangChain agent and append turns to the chat history."""
+    # Add user's message
+    history.append({"role": "user", "content": user_msg})
+
+    # Show typing placeholder
+    history.append({"role": "assistant", "content": "..."})
+
+    # Immediately show this updated state
+    yield history, history
+
+    # Replace "..." with actual response
     reply = agent.invoke({"input": user_msg})["output"]
-    history.append({"role": "user",      "content": user_msg})
-    history.append({"role": "assistant", "content": reply})
-    return history, history                      # (chatbot update, state update)
+    history[-1] = {"role": "assistant", "content": reply}
+
+    yield history, history
+
 
 # ─────────────────────────── session helpers ──────────────────────────────
 def new_chat(_, __):
@@ -74,20 +83,12 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Soft()) as demo:
                 placeholder="Ask me anything about your warehouse…"
             )
 
-            typing = gr.Markdown("Assistant is typing…",
-                                 visible=False, elem_id="typing")
-
             # interaction pipeline -----------------------------------------
             (
-                txt_in.submit(lambda: gr.update(visible=True), None, typing,
-                              show_progress=False)
-                     .then(agent_reply, [txt_in, state],
-                           [chatbot, state], show_progress="minimal")
-                     .then(lambda: "", None, txt_in,    show_progress=False)
-                     .then(lambda: gr.update(visible=False), None, typing,
-                           show_progress=False)
-                     .then(lambda: gr.update(visible=True),  None, save_btn,
-                           show_progress=False)
+                txt_in.submit(agent_reply, [txt_in, state], [chatbot, state], show_progress="minimal") \
+                .then(lambda: "", None, txt_in, show_progress=False) \
+                .then(lambda: gr.update(visible=True), None, save_btn, show_progress=False)
+
             )
 
     # ─── side-effects (new / load / save)  outside the Row  ───────────────
