@@ -1,57 +1,48 @@
 {
-  "inventory/boxes": {
-    "header": {
-      "timestamp": 0,
-      "module_id": "demo",
-      "correlation_id": "mock-boxes",
-      "version": 1
-    },
-    "boxes": [
-      {
-        "id": 3,
-        "color": "green",
-        "type": "big_box",
-        "global_pose": {
-          "x": 3490.7,
-          "y": 9909.9,
-          "z": 0,
-          "roll": 0,
-          "pitch": 0,
-          "yaw": 0
-        }
-      },
-      {
-        "id": 2,
-        "color": "red",
-        "type": "small_box",
-        "global_pose": {
-          "x": 10,
-          "y": 20,
-          "z": 0,
-          "roll": 0,
-          "pitch": 0,
-          "yaw": 0
-        }
-      }
-    ]
-  },
   "system/modules": {
-    "header": {
-      "timestamp": 0,
-      "module_id": "demo",
-      "correlation_id": "mock-mods",
-      "version": 1
-    },
-    "modules": [
+    "items": [
       {
         "namespace": "uarm_01",
         "pose": {
-          "x": 689.3,
-          "y": 700.9,
+          "x": 115.9105224609375,
+          "y": 299.32745361328125,
           "z": 105,
-          "roll": 0,
-          "pitch": 0,
-          "yaw": -3.14
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": 0.0
+        }
+      },
+      {
+        "namespace": "container_01",
+        "pose": {
+          "x": 210.71063232421875,
+          "y": 299.65582275390625,
+          "z": 130.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -3.141592653589793
+        }
+      },
+      {
+        "namespace": "container_02",
+        "pose": {
+          "x": 227.5403594970703,
+          "y": 498.21795654296875,
+          "z": 130.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -3.141592653589793
+        }
+      },
+      {
+        "namespace": "dock_01",
+        "pose": {
+          "x": 693.3380126953125,
+          "y": 709.925537109375,
+          "z": 150.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -1.5707963267948966
         }
       }
     ]
@@ -76,11 +67,240 @@
     "func": "search_for_box_in_starting_module_workspace",
     "message": "No box found in workspace of 'container_01'"
   },
+  "mmh_cam/detected_boxes": {
+    "header": {
+      "timestamp": 1750169770.2074113,
+      "module_id": "1",
+      "correlation_id": "b7abacdb-5404-47dd-9131-f79902f51643",
+      "version": 1.0,
+      "duplicate": false
+    },
+    "boxes": [
+      {
+        "id": 0,
+        "color": "green",
+        "type": "small_box",
+        "global_pose": {
+          "x": 375.00946044921875,
+          "y": 301.8983154296875,
+          "z": 15.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": 0.0
+        }
+      },
+      {
+        "id": 0,
+        "color": "red",
+        "type": "small_box",
+        "global_pose": {
+          "x": 111.0375747680664,
+          "y": 502.7107849121094,
+          "z": 15.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": 0.0
+        }
+      },
+      {
+        "id": 0,
+        "color": "red",
+        "type": "big_box",
+        "global_pose": {
+          "x": 303.1108703613281,
+          "y": 315.16839599609375,
+          "z": 15.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": 0.0
+        }
+      }
+    ]
+  },
+  "mmh_cam/detected_markers": {
+    "header": {
+      "timestamp": 1750169770.207801,
+      "module_id": "1",
+      "correlation_id": "b7abacdb-5404-47dd-9131-f79902f51643",
+      "version": 1.0,
+      "duplicate": false
+    },
+    "fiducials": [
+      {
+        "id": 16,
+        "relative_pose": {
+          "x": 627.70751953125,
+          "y": 756.1338500976562,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -1.585315227508545
+        },
+        "type": "aruco"
+      },
+      {
+        "id": 13,
+        "relative_pose": {
+          "x": 628.3380126953125,
+          "y": 649.925537109375,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -1.5481632947921753
+        },
+        "type": "aruco"
+      },
+      {
+        "id": 14,
+        "relative_pose": {
+          "x": 775.51953125,
+          "y": 644.1019897460938,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -1.5447498559951782
+        },
+        "type": "aruco"
+      },
+      {
+        "id": 25,
+        "relative_pose": {
+          "x": 244.5403594970703,
+          "y": 577.2179565429688,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -3.1331865787506104
+        },
+        "type": "aruco"
+      },
+      {
+        "id": 26,
+        "relative_pose": {
+          "x": 245.78848266601562,
+          "y": 424.09564208984375,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": 3.109220504760742
+        },
+        "type": "aruco"
+      },
+      {
+        "id": 1,
+        "relative_pose": {
+          "x": 155.27667236328125,
+          "y": 382.12628173828125,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -0.03393340855836868
+        },
+        "type": "aruco"
+      },
+      {
+        "id": 21,
+        "relative_pose": {
+          "x": 243.71063232421875,
+          "y": 380.65582275390625,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": 3.1067922115325928
+        },
+        "type": "aruco"
+      },
+      {
+        "id": 24,
+        "relative_pose": {
+          "x": 370.70068359375,
+          "y": 352.9676818847656,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -3.1381356716156006
+        },
+        "type": "aruco"
+      },
+      {
+        "id": 22,
+        "relative_pose": {
+          "x": 369.8184814453125,
+          "y": 244.4850311279297,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -3.1015625
+        },
+        "type": "aruco"
+      },
+      {
+        "id": 23,
+        "relative_pose": {
+          "x": 243.8990936279297,
+          "y": 238.0011444091797,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -2.9854254722595215
+        },
+        "type": "aruco"
+      },
+      {
+        "id": 5,
+        "relative_pose": {
+          "x": 783.8446655273438,
+          "y": 153.34854125976562,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -0.040013235062360764
+        },
+        "type": "aruco"
+      },
+      {
+        "id": 7,
+        "relative_pose": {
+          "x": 25.80561637878418,
+          "y": 47.41855239868164,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": 0.0328403003513813
+        },
+        "type": "aruco"
+      },
+      {
+        "id": 8,
+        "relative_pose": {
+          "x": 614.8075561523438,
+          "y": 847.3540649414062,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -1.5483735799789429
+        },
+        "type": "aruco"
+      },
+      {
+        "id": 4,
+        "relative_pose": {
+          "x": 785.7957763671875,
+          "y": 43.815940856933594,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -0.04249982163310051
+        },
+        "type": "aruco"
+      }
+    ]
+  },
   "base_01/base_module_visualization": {
     "header": {
-      "timestamp": 1749550798.5355618,
+      "timestamp": 1750169770.2248397,
       "module_id": "0",
-      "correlation_id": "759e32d2-b7c4-4512-9d38-84335696f9a9",
+      "correlation_id": "d3a09ac9-359e-4877-9b1b-4c4475d1e29c",
       "version": 1.0,
       "duplicate": false
     },
@@ -88,20 +308,9 @@
       {
         "namespace": "uarm_01",
         "pose": {
-          "x": 112.31765747070312,
-          "y": 299.18426513671875,
+          "x": 115.9105224609375,
+          "y": 299.32745361328125,
           "z": 105,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": 0.0
-        }
-      },
-      {
-        "namespace": "conveyor_02",
-        "pose": {
-          "x": 131.731201171875,
-          "y": 117.84535598754883,
-          "z": 58,
           "roll": 0.0,
           "pitch": 0.0,
           "yaw": 0.0
@@ -110,8 +319,8 @@
       {
         "namespace": "container_01",
         "pose": {
-          "x": 209.92100524902344,
-          "y": 297.7499084472656,
+          "x": 210.71063232421875,
+          "y": 299.65582275390625,
           "z": 130.0,
           "roll": 0.0,
           "pitch": 0.0,
@@ -121,8 +330,8 @@
       {
         "namespace": "container_02",
         "pose": {
-          "x": 226.43946838378906,
-          "y": 496.85614013671875,
+          "x": 227.5403594970703,
+          "y": 498.21795654296875,
           "z": 130.0,
           "roll": 0.0,
           "pitch": 0.0,
@@ -130,21 +339,10 @@
         }
       },
       {
-        "namespace": "uarm_02",
-        "pose": {
-          "x": 695.9927368164062,
-          "y": 889.880615234375,
-          "z": 105,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": -1.5707963267948966
-        }
-      },
-      {
         "namespace": "dock_01",
         "pose": {
-          "x": 672.2001953125,
-          "y": 668.7733154296875,
+          "x": 693.3380126953125,
+          "y": 709.925537109375,
           "z": 150.0,
           "roll": 0.0,
           "pitch": 0.0,
@@ -153,219 +351,28 @@
       }
     ]
   },
-  "mmh_cam/detected_markers": {
-    "header": {
-      "timestamp": 1749559680.6113775,
-      "module_id": "1",
-      "correlation_id": "a6d2fcc8-5c8f-4f50-a39e-d745506b525f",
-      "version": 1.0,
-      "duplicate": false
-    },
-    "fiducials": [
-      {
-        "id": 8,
-        "relative_pose": {
-          "x": 615.3411254882812,
-          "y": 849.2353515625,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": -1.5503966808319092
-        },
-        "type": "aruco"
-      },
-      {
-        "id": 14,
-        "relative_pose": {
-          "x": 754.4663696289062,
-          "y": 623.1546630859375,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": -1.4334694147109985
-        },
-        "type": "aruco"
-      },
-      {
-        "id": 25,
-        "relative_pose": {
-          "x": 243.8811492919922,
-          "y": 576.1400146484375,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": 3.1147878170013428
-        },
-        "type": "aruco"
-      },
-      {
-        "id": 28,
-        "relative_pose": {
-          "x": 382.7357482910156,
-          "y": 550.4320678710938,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": 3.074577808380127
-        },
-        "type": "aruco"
-      },
-      {
-        "id": 26,
-        "relative_pose": {
-          "x": 245.29116821289062,
-          "y": 423.37957763671875,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": -3.133507013320923
-        },
-        "type": "aruco"
-      },
-      {
-        "id": 1,
-        "relative_pose": {
-          "x": 154.32276916503906,
-          "y": 381.02081298828125,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": 0.007074656896293163
-        },
-        "type": "aruco"
-      },
-      {
-        "id": 21,
-        "relative_pose": {
-          "x": 243.26406860351562,
-          "y": 378.9449157714844,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": 3.1102356910705566
-        },
-        "type": "aruco"
-      },
-      {
-        "id": 22,
-        "relative_pose": {
-          "x": 369.8822326660156,
-          "y": 244.18167114257812,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": -3.1362695693969727
-        },
-        "type": "aruco"
-      },
-      {
-        "id": 5,
-        "relative_pose": {
-          "x": 782.4447631835938,
-          "y": 154.3764190673828,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": 0.003579338314011693
-        },
-        "type": "aruco"
-      },
-      {
-        "id": 7,
-        "relative_pose": {
-          "x": 24.940065383911133,
-          "y": 45.834224700927734,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": 0.0019424929050728679
-        },
-        "type": "aruco"
-      },
-      {
-        "id": 4,
-        "relative_pose": {
-          "x": 784.0031127929688,
-          "y": 45.60041809082031,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": 0.0019144222605973482
-        },
-        "type": "aruco"
-      },
-      {
-        "id": 16,
-        "relative_pose": {
-          "x": 593.65283203125,
-          "y": 715.4817504882812,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": -1.4358354806900024
-        },
-        "type": "aruco"
-      },
-      {
-        "id": 13,
-        "relative_pose": {
-          "x": 608.4979248046875,
-          "y": 608.883056640625,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": -1.4358291625976562
-        },
-        "type": "aruco"
-      },
-      {
-        "id": 24,
-        "relative_pose": {
-          "x": 369.8765563964844,
-          "y": 351.6730651855469,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": 3.111300468444824
-        },
-        "type": "aruco"
-      },
-      {
-        "id": 23,
-        "relative_pose": {
-          "x": 243.597412109375,
-          "y": 237.1577911376953,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": -2.9758284091949463
-        },
-        "type": "aruco"
-      }
-    ]
-  },
   "base_01/order_request": {
     "header": {
-      "timestamp": 1749545661.267242,
+      "timestamp": 1750169517.009041,
       "sender_id": "OrderGenerator",
-      "correlation_id": "d84e6af6-50af-4c26-884a-d2c9ae845b76"
+      "correlation_id": "5fcdd3a1-3ac9-46bb-978e-f890d5a65284"
     },
     "starting_module": {
-      "namespace": "container_01",
+      "namespace": "uarm_01",
       "pose": {
-        "x": 210.33316040039062,
-        "y": 297.51348876953125,
-        "z": 130.0,
+        "x": 112.88223266601562,
+        "y": 299.5472106933594,
+        "z": 105,
         "roll": 0.0,
         "pitch": 0.0,
-        "yaw": -3.141592653589793
+        "yaw": 0.0
       }
     },
     "goal": {
       "namespace": "container_02",
       "pose": {
-        "x": 227.21205139160156,
-        "y": 497.1959228515625,
+        "x": 228.8416748046875,
+        "y": 497.24212646484375,
         "z": 130.0,
         "roll": 0.0,
         "pitch": 0.0,
@@ -373,7 +380,7 @@
       }
     },
     "cargo_box": {
-      "id": 0,
+      "id": 7,
       "color": "red",
       "type": "small",
       "global_pose": {
@@ -386,155 +393,7 @@
       }
     }
   },
-  "base_01/uarm_01/transport/response": {
-    "header": {
-      "correlation_id": "0989b096-3a7c-4273-92df-1a057b8866d5"
-    },
-    "response": "failed",
-    "success": false
-  },
-  "base_01/order_request/response/dd42d27f-8660-4ec7-85fc-d929bc47fd94": {
-    "header": {
-      "timestamp": 1749122281.8450103,
-      "module_id": "0",
-      "correlation_id": "dd42d27f-8660-4ec7-85fc-d929bc47fd94",
-      "version": 1.0,
-      "duplicate": false
-    },
-    "success": null
-  },
-  "base_01/order_request/response/\"12345\"  // Assuming a hypothetical correlation ID from previous attempts": {
-    "header": {
-      "timestamp": 1749127487.3534575,
-      "module_id": "0",
-      "correlation_id": "\"12345\"  // Assuming a hypothetical correlation ID from previous attempts",
-      "version": 1.0,
-      "duplicate": false
-    },
-    "success": false
-  },
-  "base_01/order_request/response/c724faed-c40c-465b-8a06-e6a79eae0fd1": {
-    "header": {
-      "timestamp": 1749127780.5698805,
-      "module_id": "0",
-      "correlation_id": "c724faed-c40c-465b-8a06-e6a79eae0fd1",
-      "version": 1.0,
-      "duplicate": false
-    },
-    "success": true
-  },
-  "base_01/order_request/response/60497acc-77a7-40ed-a441-5e4914ea7d0c": {
-    "header": {
-      "timestamp": 1749128925.128584,
-      "module_id": "0",
-      "correlation_id": "60497acc-77a7-40ed-a441-5e4914ea7d0c",
-      "version": 1.0,
-      "duplicate": false
-    },
-    "success": null
-  },
-  "base_01/order_request/response/edb21a24-9560-4408-aba5-4b4c1a7ebb6f": {
-    "header": {
-      "timestamp": 1749128957.0866768,
-      "module_id": "0",
-      "correlation_id": "edb21a24-9560-4408-aba5-4b4c1a7ebb6f",
-      "version": 1.0,
-      "duplicate": false
-    },
-    "success": true
-  },
-  "base_01/order_request/response/032b7629-b7bf-4eaf-9e41-7d754a1378d2": {
-    "header": {
-      "timestamp": 1749129389.4413624,
-      "module_id": "0",
-      "correlation_id": "032b7629-b7bf-4eaf-9e41-7d754a1378d2",
-      "version": 1.0,
-      "duplicate": false
-    },
-    "success": null
-  },
-  "base_01/order_request/response/8da80ac5-03ff-4ce5-a205-19c7ec770b9d": {
-    "header": {
-      "timestamp": 1749130922.9410284,
-      "module_id": "0",
-      "correlation_id": "8da80ac5-03ff-4ce5-a205-19c7ec770b9d",
-      "version": 1.0,
-      "duplicate": false
-    },
-    "success": null
-  },
-  "base_01/order_request/response/3b98e0e6-a42c-4960-b4d1-740b38f160e1": {
-    "header": {
-      "timestamp": 1749131159.6331246,
-      "module_id": "0",
-      "correlation_id": "3b98e0e6-a42c-4960-b4d1-740b38f160e1",
-      "version": 1.0,
-      "duplicate": false
-    },
-    "success": null
-  },
-  "base_01/order_request/response/94b0ef7d-536d-41e7-b7ff-ec7ee4012c30": {
-    "header": {
-      "timestamp": 1749201186.3581789,
-      "module_id": "0",
-      "correlation_id": "94b0ef7d-536d-41e7-b7ff-ec7ee4012c30",
-      "version": 1.0,
-      "duplicate": false
-    },
-    "success": null
-  },
-  "base_01/order_request/response/90512794-102a-471f-a42f-f1de1b5180fe": {
-    "header": {
-      "timestamp": 1749210060.0819046,
-      "module_id": "0",
-      "correlation_id": "90512794-102a-471f-a42f-f1de1b5180fe",
-      "version": 1.0,
-      "duplicate": false
-    },
-    "success": null
-  },
-  "mmh_cam/detected_boxes": {
-    "header": {
-      "timestamp": 1749559680.605866,
-      "module_id": "1",
-      "correlation_id": "a6d2fcc8-5c8f-4f50-a39e-d745506b525f",
-      "version": 1.0,
-      "duplicate": false
-    },
-    "boxes": [
-      {
-        "id": 0,
-        "color": "red",
-        "type": "small_box",
-        "global_pose": {
-          "x": 832.4563598632812,
-          "y": 127.01057434082031,
-          "z": 15.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": 0.0
-        }
-      }
-    ]
-  },
-  "base_01/order_request/response/1f3509b2-6226-4c1b-884e-0c18a4175c35": {
-    "header": {
-      "timestamp": 1749216244.3780382,
-      "module_id": "0",
-      "correlation_id": "1f3509b2-6226-4c1b-884e-0c18a4175c35",
-      "version": 1.0,
-      "duplicate": false
-    },
-    "success": null
-  },
-  "base_01/order_request/response/a4161d07-26e2-4d7a-b80c-c85c20034908": {
-    "header": {
-      "timestamp": 1749216668.758857,
-      "module_id": "0",
-      "correlation_id": "a4161d07-26e2-4d7a-b80c-c85c20034908",
-      "version": 1.0,
-      "duplicate": false
-    },
-    "success": false
+  "master/state": {
+    "data": "Online"
   }
 }

@@ -10,7 +10,7 @@ from snapshot_manager import snapshot_store   # keeps type checkers happy
 from typing import List
 from mqtt_listener import BROKER_CONNECTED, LAST_MASTER_MSG
 ONLINE_TIMEOUT = 30.0      # seconds without a master message → “offline”
-
+from rapidfuzz import process
 
 
 # MQTT CONFIG
@@ -40,22 +40,31 @@ def _iter_modules():
         or env.data.get("modules", [])        # raw, just in case
     )
 
-
 @tool
 def master_status() -> dict:
     """
-    Return {'online': bool, 'since': <seconds>} telling whether the Master
-    controller appears alive (based on recent MQTT traffic under 'master/…').
+    Check if the Master controller is online based on the latest 'master/state' message.
     """
-    if not BROKER_CONNECTED:
-        return {"online": False, "since": None,
-                "info": "MQTT broker unreachable"}
+    from mqtt_listener import snapshot_store
 
-    age = time.time() - LAST_MASTER_MSG
+    # use raw payload (not normalized)
+    payload = snapshot_store.snapshots.get("master/state")
+    if not payload:
+        return {
+            "online": False,
+            "info": "No message received from master/state"
+        }
+
+    status = str(payload.get("data", "")).lower()
+    is_online = status == "online"
+
     return {
-        "online": age < ONLINE_TIMEOUT,
-        "since" : round(age, 1)          # age of last heartbeat
+        "online": is_online,
+        "info": f"Master state: {status}"
     }
+
+
+
     
     
 def _pose_from_module(namespace: str):
@@ -91,6 +100,7 @@ def _start_result_listener():
     client.connect(BROKER, PORT)
     client.subscribe(f"{ORDER_RESPONSE_BASE_TOPIC}/#")
     threading.Thread(target=client.loop_forever, daemon=True).start()
+
 
 
 # TOOL DEFINITIONS
@@ -178,37 +188,72 @@ def find_last_order(args: dict = {}) -> dict:
         return {"found": True, "order": env.data["order"]}
     except Exception as e:
         return {"found": False, "error": f"Failed to normalize order: {e}"}
-
+# ── unified trigger_order tool ────────────────────────────────────────────
 @tool(args_schema={
-    "start": str,
-    "goal":  str,
-    "color": str,
-    "box_id": int
+    # You may supply either module names OR explicit poses.
+    "start":      str,   # namespace of the starting module (optional)
+    "goal":       str,   # namespace of the goal   module (optional)
+    "start_pose": dict,  # raw pose of the start   position (optional)
+    "goal_pose":  dict   # raw pose of the goal    position (optional)
 })
-def trigger_order(start: str, goal: str, color: str, box_id: int) -> dict:
+def trigger_order(*,
+                  start: str | None = None,
+                  goal: str | None = None,
+                  start_pose: dict | None = None,
+                  goal_pose: dict | None = None) -> dict:
     """
-    Build and publish a transport order.
+    Dispatch a transport order.
 
-    • Looks up live poses of `start` and `goal` modules.  
-    • Publishes to `base_01/order_request`.  
-    • Starts a background listener (once) for order results.  
-    • Returns an ACK with `correlation_id`.
+    You **must** provide at least one of each pair below:
+
+    • `start` **or** `start_pose`
+    • `goal`  **or** `goal_pose`
+
+    If you give raw poses, the tool will tag them as
+    `manual_pose_start` / `manual_pose_goal` so the master controller
+    bypasses the “search for box in module workspace” step.
     """
+
+    # ------------------------------------------------------------------ #
+    # 0. globals / one-shot MQTT listener                                #
+    # ------------------------------------------------------------------ #
     global _result_listener_started, current_order_id
 
-    # Start listener once
     if not _result_listener_started:
         _start_result_listener()
         _result_listener_started = True
 
-    # Pose look-ups
+    # ------------------------------------------------------------------ #
+    # 1. determine poses + namespaces                                    #
+    # ------------------------------------------------------------------ #
     try:
-        start_pose = _pose_from_module(start)
-        goal_pose  = _pose_from_module(goal)
+        # -- starting point --------------------------------------------
+        if start_pose is not None:
+            start_pose_val = start_pose
+            start_ns       = "manual_pose_start"
+        elif start is not None:
+            start_pose_val = _pose_from_module(start)
+            start_ns       = start
+        else:
+            raise ValueError("trigger_order: provide either 'start' or 'start_pose'")
+
+        # -- goal point -------------------------------------------------
+        if goal_pose is not None:
+            goal_pose_val  = goal_pose
+            goal_ns        = "manual_pose_goal"
+        elif goal is not None:
+            goal_pose_val  = _pose_from_module(goal)
+            goal_ns        = goal
+        else:
+            raise ValueError("trigger_order: provide either 'goal' or 'goal_pose'")
+
     except ValueError as exc:
         return {"found": False, "error": str(exc)}
 
-    correlation_id  = str(uuid.uuid4())
+    # ------------------------------------------------------------------ #
+    # 2. build MQTT payload                                              #
+    # ------------------------------------------------------------------ #
+    correlation_id   = str(uuid.uuid4())
     current_order_id = correlation_id
 
     payload = {
@@ -218,33 +263,40 @@ def trigger_order(start: str, goal: str, color: str, box_id: int) -> dict:
             "correlation_id": correlation_id
         },
         "starting_module": {
-            "namespace": start,
-            "pose": start_pose
+            "namespace": start_ns,
+            "pose": start_pose_val
         },
         "goal": {
-            "namespace": goal,
-            "pose": goal_pose
+            "namespace": goal_ns,
+            "pose": goal_pose_val
         },
         "cargo_box": {
-            "id": box_id,
-            "color": color,
-            "type": "small",
-            "global_pose": {
-                "x": 0, "y": 0, "z": 0,
-                "roll": 0, "pitch": 0, "yaw": 0
-            }
+            # change these fields if your workflow needs something else
+            "id":    7,
+            "color": "red",
+            "type":  "small",
+            "global_pose": {"x": 0, "y": 0, "z": 0,
+                            "roll": 0, "pitch": 0, "yaw": 0}
         }
     }
 
-    # MQTT publish
+    # ------------------------------------------------------------------ #
+    # 3. publish                                                         #
+    # ------------------------------------------------------------------ #
     client = mqtt.Client()
     client.connect(BROKER, PORT)
     client.publish(ORDER_REQUEST_TOPIC, json.dumps(payload))
+    client.disconnect()
+
     print(f"[trigger_order] ➡ Dispatched order {correlation_id}")
 
-    return {"found": True,
-            "message": "Order dispatched. Await result asynchronously.",
-            "correlation_id": correlation_id}
+    return {
+        "found": True,
+        "correlation_id": correlation_id,
+        "message": "Order dispatched. Await result asynchronously."
+    }
+
+
 
 @tool(args_schema={"correlation_id": str})
 def cancel_order(correlation_id: str):
@@ -416,11 +468,29 @@ def _ensure_dict(inp: Any) -> Dict[str, Any]:
 
 # ---------- one wrapper per original tool -------------------
 def find_box_wrap(arg: Any):
-    d = _ensure_dict(arg)
-    if "box_id" not in d:
-        raise ValueError("find_box expects box_id:int, but none was provided.")
-    d["box_id"] = int(d["box_id"])  # ensure int
-    return find_box.invoke(d)
+    try:
+        if isinstance(arg, int):
+            d = {"box_id": arg}
+        elif isinstance(arg, dict):
+            d = arg
+        elif isinstance(arg, str):
+            arg = arg.strip()
+            if arg.isdigit():
+                d = {"box_id": int(arg)}
+            else:
+                d = _ensure_dict(arg)
+        else:
+            d = _ensure_dict(arg)
+
+        if "box_id" not in d:
+            raise ValueError("find_box expects box_id:int, but none was provided.")
+
+        d["box_id"] = int(d["box_id"])  # ensure type safety
+        return find_box.invoke(d)
+    except Exception as e:
+        return {"found": False, "error": f"Invalid input to find_box: {e}"}
+
+
 
 
 def find_box_by_color_wrap(arg: Any):
@@ -433,16 +503,42 @@ def find_module_wrap(arg: Any):
     d = _ensure_dict(arg)
     if "namespace" not in d and arg:
         d = {"namespace": str(arg).strip()}
+
+    original = d["namespace"]
+
+    # Get all available module names
+    known_modules = list_modules.invoke({})
+
+    # Fuzzy match
+    best_match, score, _ = process.extractOne(original, known_modules)
+
+    if score > 80:  # threshold can be adjusted
+        print(f"[FuzzyMatch] Interpreting '{original}' as '{best_match}' (score: {score})")
+        d["namespace"] = best_match
+    else:
+        print(f"[FuzzyMatch] No close match found for '{original}' (best was '{best_match}', score: {score})")
+
     return find_module.invoke(d)
 
 def trigger_order_wrap(arg: Any):
     d = _ensure_dict(arg)
-    required = {"start", "goal", "color", "box_id"}
-    if not required.issubset(d):
-        raise ValueError(f"trigger_order expects {required}")
-    d["box_id"] = int(d["box_id"])
+
+    # QUICK shorthand: "x=..., y=..., goal=container_01"
+    # becomes {"start_pose": {...}, "goal": "container_01"}
+    if {"x", "y"}.issubset(d.keys()):
+        pose_keys = ("x","y","z","roll","pitch","yaw")
+        d["start_pose"] = {k: float(d.get(k, 0)) for k in pose_keys}
+        for k in pose_keys: d.pop(k, None)
+
+    if not (("start" in d or "start_pose" in d) and
+            ("goal"  in d or "goal_pose"  in d)):
+        raise ValueError("trigger_order expects start/goal or start_pose/goal_pose")
+
     print("[DEBUG] Parsed trigger_order args:", d)
     return trigger_order.invoke(d)
+
+
+
 
 def cancel_order_wrap(arg: Any):
     d = _ensure_dict(arg)
@@ -470,9 +566,9 @@ MRKL_TOOLS = [
          "list_boxes() → summary of boxes"),
     Tool("find_last_order",    find_last_order_wrap,
          "find_last_order() → last completed order"),
-    Tool("trigger_order",      trigger_order_wrap,
-         ("trigger_order(start:str, goal:str, color:str, "
-          "box_id:int) → dispatch order")),
+    Tool(
+    "trigger_order", trigger_order_wrap,
+    "trigger_order(start:str, goal:str) → dispatch order with static box. Example: trigger_order(start=container_02, goal=container_01)"),
     Tool("cancel_order",       cancel_order_wrap,
          "cancel_order(correlation_id:str)"),
     Tool("confirm_last_order", confirm_last_order_wrap,

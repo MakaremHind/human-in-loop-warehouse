@@ -33,6 +33,7 @@ TOPICS = [
     "master/logs/execute_planned_path/debug",
     "master/logs/execute_planned_path/warning",
     "master/logs/search_for_box_in_starting_module_workspace/warning",
+    "master/state", 
 ]
 
 # local in-memory cache for Envelope-type snapshots
@@ -42,9 +43,14 @@ snapshots: dict[str, object] = {}
 # ───────────────────────── MQTT callbacks ──────────────────────────
 def on_connect(client, userdata, flags, rc, properties=None):
     global BROKER_CONNECTED
-    BROKER_CONNECTED = rc == 0            # rc==0 → success
-    if not BROKER_CONNECTED:
-        logging.warning("MQTT broker unreachable (rc=%s)", rc)
+    if rc == 0:
+        BROKER_CONNECTED = True
+        logging.info("Connected to MQTT broker.")
+        for t in TOPICS:
+            client.subscribe(t)
+    else:
+        logging.warning("Failed to connect to MQTT broker (rc=%s)", rc)
+
 
 
 def on_message(client, userdata, msg):
@@ -83,11 +89,9 @@ client.on_connect = on_connect
 client.on_message = on_message
 try:
     client.connect(BROKER, PORT, keepalive=30)
+    BROKER_CONNECTED = True
 except Exception as e:
     logging.error("Could not connect to MQTT broker: %s", e)
-
-for t in TOPICS:
-    client.subscribe(t)
 
 client.loop_start()                        # background thread
 

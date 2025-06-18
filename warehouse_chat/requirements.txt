@@ -5,3 +5,5 @@ langchain-ollama
 paho-mqtt
 pydantic
 typing-extensions
+rapidfuzz
+
