@@ -4,13 +4,17 @@ from langchain.agents import Tool, initialize_agent, AgentType
 from langchain_ollama import ChatOllama
 from tools import ALL_TOOLS 
 from tools import MRKL_TOOLS     # your tool objects
+from langchain.memory import ConversationBufferMemory
 
 
 # -------- 1. LLM backend --------------------------------
 llm = ChatOllama(
-    model=os.getenv("OLLAMA_MODEL", "qwen3:latest"),
+    model=os.getenv("OLLAMA_MODEL", "huihui_ai/qwen3-abliterated:latest"),
+    speed=os.getenv("OLLAMA_SPEED", "fast"),
     temperature=0.0
 )
+
+memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
 # -------- 2. Wrap your tools so LangChain can call them --
 toolkit = []
@@ -29,7 +33,9 @@ agent = initialize_agent(
     llm=llm,
     agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
     verbose=True,
-    handle_parsing_errors=True,
+    max_iterations=None,
+    limit_iterations=False,
+    handle_parsing_errors=True, 
     agent_kwargs={
         "prefix": """You are an AI agent integrated into a warehouse management system. Follow these guidelines when interpreting requests and deciding on actions:
 
@@ -39,6 +45,11 @@ agent = initialize_agent(
 
 3. When triggering an order, ignore the box position and just use the module name. For example, if the user says "trigger order for uarm_01", you should trigger the order for uarm_01 without considering the box position.
 
+4. try not to stuck in a loop of calling the same tool repeatedly. If you have already called a tool and it did not yield a result, consider alternative actions or tools instead of repeating the same call.
+
+5. when triggering multiple orders, wait for the first order to complete before triggering the next one. This ensures that the system processes each order sequentially and avoids potential conflicts or resource contention.
+
+6. If you achive the goal, stop and give the final answer. Do not continue to call tools or take actions that are not necessary to achieve the goal.
 You have access to the following tools:""",
         "suffix": """Begin. Remember to reason step by step. and don't trigger an order unless the user explicitly asks for it.
 Question: {input}
