@@ -44,10 +44,7 @@ def master_status() -> dict:
     """
     Check if the Master controller is online based on the latest 'master/state' message.
     """
-    from mqtt_listener import snapshot_store
-
-    # use raw payload (not normalized)
-    payload = snapshot_store.snapshots.get("master/state")
+    payload = snapshot_store.get("master/state")
     if not payload:
         return {
             "online": False,
@@ -61,7 +58,6 @@ def master_status() -> dict:
         "online": is_online,
         "info": f"Master state: {status}"
     }
-
 
 
     
@@ -172,7 +168,6 @@ def find_module(namespace: str):
 
     return _nf("module", namespace)
 
-# ── list every cached order result ───────────────────────────────────────
 # ── list every order response currently cached ────────────────────────────
 @tool
 def list_orders() -> dict:
@@ -180,12 +175,13 @@ def list_orders() -> dict:
     Return **all** order-response payloads held in `snapshot_store`
     (newest first).
     """
-    from snapshot_manager import snapshot_store
+    orders = []
+    for topic in snapshot_store.snapshots:
+        if topic.startswith("base_01/order_request/response"):
+            payload = snapshot_store.get(topic)
+            if payload:
+                orders.append(payload)
 
-    orders = [
-        p for t, p in snapshot_store.snapshots.items()
-        if t.startswith("base_01/order_request/response")
-    ]
     if not orders:
         return {"found": False,
                 "error": "No order responses present in snapshot_store."}
@@ -193,6 +189,7 @@ def list_orders() -> dict:
     orders.sort(key=lambda p: p.get("header", {}).get("timestamp", 0),
                 reverse=True)
     return {"found": True, "orders": orders}
+
 
 
 
