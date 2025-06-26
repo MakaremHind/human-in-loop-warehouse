@@ -1,5 +1,4 @@
 #tools.py
-
 from typing import Dict, Any
 import logging, json, time, uuid, threading
 import paho.mqtt.client as mqtt
@@ -253,17 +252,17 @@ def trigger_order(*,
 
     # ── 1. resolve start / goal poses ─────────────────────────────────
     try:
-        if start_pose is not None:
-            start_pose_val, start_ns = start_pose, "manual_pose_start"
-        elif start is not None:
+        if start is not None:
             start_pose_val, start_ns = _pose_from_module(start), start
+        elif start_pose is not None:
+            start_pose_val, start_ns = start_pose, "manual_pose_start"
         else:
             raise ValueError("provide either 'start' or 'start_pose'")
 
-        if goal_pose is not None:
-            goal_pose_val,  goal_ns  = goal_pose, "manual_pose_goal"
-        elif goal is not None:
+        if goal is not None:
             goal_pose_val,  goal_ns  = _pose_from_module(goal), goal
+        elif goal_pose is not None:
+            goal_pose_val,  goal_ns  = goal_pose, "manual_pose_goal"
         else:
             raise ValueError("provide either 'goal' or 'goal_pose'")
 
@@ -505,121 +504,80 @@ def find_module_wrap(arg: Any):
 # ──────────────── trigger_order_wrap (handles *all* cases) ────────────────
 import ast, json, re
 
-def trigger_order_wrap(arg: Any):
+def trigger_order_wrap(arg: Any) -> dict:
     """
-    Normalises the LLM/user input so it always fits the schema that
-    `trigger_order` expects.
-
-    Works with:
-      • module names               start=conveyor_02, goal=container_01
-      • pose shorthand             x=0.4, y=0.3, z=0, goal=container_01
-      • dict strings (Python/JSON) start={'x':0.4,'y':0.3}, goal={"x":1,"y":2}
-      • box-pose shorthand         bx=…, by=…, …
-      • any mixture of the above
+    Wrapper around trigger_order that handles string, dict, and mixed inputs.
+    Supports fuzzy module matching and auto-fills box pose if only box ID or color is given.
     """
 
-    # ------------------------------------------------------------------ #
-    # 0. turn *anything* into a dict                                     #
-    # ------------------------------------------------------------------ #
-    if isinstance(arg, dict):                         # already a dict
-        d = arg.copy()
-    else:
-        text = str(arg).strip()
+    def parse_input(arg: Any) -> dict:
+        if isinstance(arg, dict):
+            return arg
+        if isinstance(arg, str):
+            try:
+                return json.loads(arg)
+            except json.JSONDecodeError:
+                return _parse_kv(arg)
+        raise ValueError("Unsupported input format")
 
-        # --- helper: split top-level commas (braces may nest) ----------
-        def _split_top_level(commastr: str):
-            segs, depth, buff = [], 0, []
-            for ch in commastr:
-                if ch == ',' and depth == 0:
-                    segs.append(''.join(buff).strip()); buff = []
-                else:
-                    if ch == '{': depth += 1
-                    if ch == '}': depth -= 1
-                    buff.append(ch)
-            segs.append(''.join(buff).strip())
-            return segs
+    try:
+        args = parse_input(arg)
 
-        d = {}
-        for part in _split_top_level(text):
-            if not part: continue
-            if '=' not in part and ':' not in part:
-                # lone value like  {"x":…}  → assume JSON dict
-                val = part
-                key = None
-            else:
-                key, val = re.split(r'[=:]', part, 1)
-                key, val = key.strip(), val.strip()
+        # Normalize start/goal module names (fuzzy match via find_module_wrap)
+        if "start" in args:
+            start_info = find_module_wrap(args["start"])
+            if not start_info.get("found"):
+                return {"found": False, "error": f"Invalid start module '{args['start']}'"}
+            args["start_pose"] = start_info["pose"]
+            args["start"] = start_info["namespace"]
 
-            # try to parse dict literals
-            if val.startswith('{') and val.endswith('}'):
-                try:
-                    val_parsed = json.loads(val.replace("'", '"'))
-                except json.JSONDecodeError:
-                    val_parsed = ast.literal_eval(val)
-                d[key or "pose"] = val_parsed
-            else:
-                d[key] = val.strip("'\"")          # strip stray quotes
+        if "goal" in args:
+            goal_info = find_module_wrap(args["goal"])
+            if not goal_info.get("found"):
+                return {"found": False, "error": f"Invalid goal module '{args['goal']}'"}
+            args["goal_pose"] = goal_info["pose"]
+            args["goal"] = goal_info["namespace"]
 
-    # helper: convert numeric-looking strings to numbers
-    def _numify(v):
-        if isinstance(v, str):
-            try: return float(v) if '.' in v else int(v)
-            except ValueError: return v
-        return v
-    d = {k: _numify(v) for k, v in d.items()}
+        # Normalize box data
+        if "box_id" in args:
+            try:
+                box_info = find_box_wrap({"box_id": int(args["box_id"])})
+            except Exception:
+                box_info = {"found": False}
+        elif "box_color" in args:
+            box_info = find_box_by_color_wrap({"color": args["box_color"]})
+        else:
+            box_info = {"found": False}
 
-    # ------------------------------------------------------------------ #
-    # 1. dicts after start=/goal= → *_pose                                #
-    # ------------------------------------------------------------------ #
-    if isinstance(d.get("start"), dict):
-        d["start_pose"] = d.pop("start")
-    if isinstance(d.get("goal"), dict):
-        d["goal_pose"] = d.pop("goal")
+        if box_info.get("found", False):
+            args.setdefault("box_id", box_info.get("id"))
+            args.setdefault("box_color", box_info.get("color"))
+            args.setdefault("box_pose", box_info.get("global_pose"))
 
-    # ------------------------------------------------------------------ #
-    # 2. x/y shorthand → start_pose                                       #
-    # ------------------------------------------------------------------ #
-    if {"x", "y"}.issubset(d.keys()):
-        pose_keys = ("x", "y", "z", "roll", "pitch", "yaw")
-        d["start_pose"] = {k: float(d.pop(k, 0)) for k in pose_keys}
-
-    # ------------------------------------------------------------------ #
-    # 3. bx/by shorthand → box_pose                                       #
-    # ------------------------------------------------------------------ #
-    if {"bx", "by"}.issubset(d.keys()):
-        bmap = {
-            "bx": "x", "by": "y", "bz": "z",
-            "broll": "roll", "bpitch": "pitch", "byaw": "yaw"
+        # Clean up input for trigger_order
+        final_args = {
+            "start": args.get("start"),
+            "goal": args.get("goal"),
+            "start_pose": args.get("start_pose"),
+            "goal_pose": args.get("goal_pose"),
+            "box_id": args.get("box_id"),
+            "box_color": args.get("box_color"),
+            "box_pose": args.get("box_pose"),
+            "wait_timeout": int(args.get("wait_timeout", 60))
         }
-        d["box_pose"] = {out: float(d.pop(inp, 0))
-                         for inp, out in bmap.items() if inp in d}
 
-    # ------------------------------------------------------------------ #
-    # 4. sanity check                                                     #
-    # ------------------------------------------------------------------ #
-    if not (("start" in d or "start_pose" in d) and
-            ("goal"  in d or "goal_pose"  in d)):
-        raise ValueError(
-            "trigger_order_wrap: you must provide "
-            "(start | start_pose) AND (goal | goal_pose)"
-        )
+        return trigger_order.invoke(final_args)
 
-    print("[DEBUG] Parsed trigger_order args:", d)
-    return trigger_order.invoke(d)
-
-
-
-
-list_orders_wrap = lambda _="": list_orders.invoke({})
-
-def diagnose_failure_wrap(_: Any = ""):
-    return diagnose_failure.invoke({})
+    except Exception as e:
+        return {"found": False, "error": f"trigger_order_wrap failed: {e}"}
 
 
 # tools without args
 list_boxes_wrap        = lambda _="": list_boxes.invoke({})
 find_last_order_wrap   = lambda _="": find_last_order.invoke({})
 confirm_last_order_wrap= lambda _="": confirm_last_order.invoke({})
+diagnose_failure_wrap   = lambda _="": diagnose_failure.invoke({})
+list_orders_wrap        = lambda _="": list_orders.invoke({})
 
 # ---------- MRKL-compatible toolkit -------------------------
 MRKL_TOOLS = [

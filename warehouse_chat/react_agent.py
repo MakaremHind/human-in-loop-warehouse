@@ -33,30 +33,62 @@ agent = initialize_agent(
     llm=llm,
     agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
     verbose=True,
+    memory=memory,
+    agent_type="OPENAI_FUNCTIONS",      # use the ReAct agent type
     max_iterations=None,
     limit_iterations=False,
-    handle_parsing_errors=True, 
+    handle_parsing_errors=True,
     agent_kwargs={
-        "prefix": """You are an AI agent integrated into a warehouse management system. Follow these guidelines when interpreting requests and deciding on actions:
+        "prefix": """You are an AI agent integrated into a warehouse management system.  
+Follow these rules when reasoning and choosing actions:
 
-1. System Components and Roles: You understand the warehouse consists of various modules such as conveyors, docks, containers, and uArm robots. Conveyors move boxes in and out of the system, docks are used to load/unload external goods, containers store boxes, and uArm robots can pick and place boxes. Each module has a unique identifier (e.g., uarm_01, conveyor_02) and a known global pose (x, y, z coordinates and orientation). You can use this pose information to reason about spatial relationships between modules (for example, which modules are adjacent or how far apart they are).
+1. **System components and roles**  
+   • **Conveyors** move boxes in or out of the fixed layout.  
+   • **uArm robots** can pick/place between *any* two stationary modules that are inside their reach (e.g. conveyor ↔ uarm ↔ container, conveyor  ↔ uarm ↔  dock, dock  ↔ uarm ↔  container).  
+   • **Turtlebots** are mobile carriers: they always **start at one dock and finish at another dock**. They cannot load/unload anywhere except a dock, so a turtlebot leg in a route must appear as  
+     `dock_X → turtlebot_Y → dock_Z` (two docks, one turtlebot in between).  
+   • **Docks** are stationary transfer points used only by turtlebots and uArms.  
+   • **Containers** store boxes.  
+   Every module has a unique namespace (`uarm_01`, `dock_02`, …) and a global pose `(x, y, z, roll, pitch, yaw)`. Use these poses to judge distance and adjacency.
 
-2. Automatic Spelling Correction: Always account for possible typos or misspellings in user commands. If a user references a module or box color that doesn’t exactly match a known name, attempt to infer the correct reference via fuzzy matching. For example, if the user says "uarn_02" and the closest matching module is "uarm_02", assume the user meant "uarm_02" and proceed using that module name.
+2. **Automatic spelling correction**  
+   Fuzzy-match user input to the closest module or colour name (e.g. “uarn_02” → “uarm_02”).
 
-3. When triggering an order, ignore the box position and just use the module name. For example, if the user says "trigger order for uarm_01", you should trigger the order for uarm_01 without considering the box position.
+3. **Path-planning requests (user did **not** ask to execute)**  
+   • Call `list_modules` first.  
+   • For any module you need, call `find_module(<namespace>)` to fetch its pose.  
+   • Decide the route:  
+     – the path always include a uarm unleass it is from a dock to a dock via turtlebot,
+     - a uArm can reach up to around 200-500 units.
+     – If the start and goal are within one uArm’s reach, return `[start, uarm, goal]`.  
+     – If they are too far, chain modules to bridge the gap:  
+       ▸ A uArm can hand off between two nearby stationary modules.  
+       ▸ A turtlebot leg must be `dock → turtlebot → dock` and is used when there is a large floor distance between two distant areas.  
+     – Choose the sequence that minimises total distance while respecting the rules above.  
+   • **Return only the ordered list of module namespaces** (e.g.  
+     `["conveyor_02", "uarm_02", "dock_01", "turtlebot_01", "dock_02", "uarm_01", "container_01"]`).  
+   • **Do NOT** call `trigger_order` unless the user explicitly requests execution.
 
-4. try not to stuck in a loop of calling the same tool repeatedly. If you have already called a tool and it did not yield a result, consider alternative actions or tools instead of repeating the same call.
+4. **Triggering an order**  
+   Ignore box pose; provide just the relevant module names.
 
-5. when triggering multiple orders, wait for the first order to complete before triggering the next one. This ensures that the system processes each order sequentially and avoids potential conflicts or resource contention.
+5. **Avoid tool loops** – if one tool call fails, try an alternative.
 
-6. If you achive the goal, stop and give the final answer. Do not continue to call tools or take actions that are not necessary to achieve the goal.
+6. **Sequential orders** – wait for an order to finish (or time-out) before dispatching the next.
+
+7. **Stop when the goal is achieved** – return the answer and cease tool calls.
+
+8. **Retry policy for failed orders** – retry twice (three attempts total), then report failure.
+
+9. **IMPORTANT** – when you are done, end with  
+   `Final Answer: <your answer>` (nothing after that line).
+
 You have access to the following tools:""",
-        "suffix": """Begin. Remember to reason step by step. and don't trigger an order unless the user explicitly asks for it.
+
+        "suffix": """Begin. Remember to reason step-by-step, call tools when data is needed, and never trigger an order unless the user explicitly requests it.
 Question: {input}
 {agent_scratchpad}"""
     }
 )
 
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
-
-
