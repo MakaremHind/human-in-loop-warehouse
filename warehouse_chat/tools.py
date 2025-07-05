@@ -95,10 +95,54 @@ def _start_result_listener():
     client.connect(BROKER, PORT)
     client.subscribe(f"{ORDER_RESPONSE_BASE_TOPIC}/#")
     threading.Thread(target=client.loop_forever, daemon=True).start()
+    
+
+@tool(args_schema={"start": str, "goal": str})
+def plan_path(start: str, goal: str) -> List[str]:
+    """
+    Plan a valid transport path between warehouse modules.
+    (see docstring for full rules)
+    """
+
+    modules = _iter_modules()
+    poses = {m["namespace"]: m["pose"] for m in modules}
+
+    if start not in poses:
+        raise ValueError(f"Start module '{start}' not found.")
+    if goal not in poses:
+        raise ValueError(f"Goal module '{goal}' not found.")
+
+    start_pose = poses[start]
+    goal_pose = poses[goal]
+
+    def euclidean(p1, p2):
+        return ((p1["x"] - p2["x"])**2 + (p1["y"] - p2["y"])**2) ** 0.5
+
+    # Get available modules
+    uarms = [m for m in modules if m["namespace"].startswith("uarm")]
+    docks = [m for m in modules if m["namespace"].startswith("dock")]
+
+    # Try direct uArm route first
+    distance = euclidean(start_pose, goal_pose)
+    if distance < 500:
+        # Choose closest uArm to start
+        nearest_uarm = min(uarms, key=lambda u: euclidean(u["pose"], start_pose))
+        return [start, nearest_uarm["namespace"], goal]
+
+    # Too far → use turtlebot leg between docks (docks not shown in path)
+    dock_start = min(docks, key=lambda d: euclidean(start_pose, d["pose"]))
+    dock_goal  = min(docks, key=lambda d: euclidean(goal_pose,  d["pose"]))
+
+    # uArm to connect to turtlebot at each end
+    uarm_start = min(uarms, key=lambda u: euclidean(u["pose"], start_pose))
+    uarm_goal  = min(uarms, key=lambda u: euclidean(u["pose"], goal_pose))
+
+    # Placeholder turtlebot
+    turtlebot = "turtlebot_01"
+
+    return [start, uarm_start["namespace"], turtlebot, uarm_goal["namespace"], goal]
 
 
-
-# TOOL DEFINITIONS
 @tool
 def list_boxes() -> list:
     """Return `[id, color, type]` for every detected box (no pose)."""
@@ -121,16 +165,28 @@ def find_box(box_id: int):
 @tool(args_schema={"color": str})
 def find_box_by_color(color: str):
     """
-    Return the first box with matching color.
+    Return **all** boxes with the matching color, including their poses.
     If none found, returns `found: False`.
     """
     env = get("mmh_cam/detected_boxes")
-    if not env or not env.data["boxes"]:
+    if not env or not env.data.get("boxes"):
         return _nf("box(color)", color)
-    for b in env.data["boxes"]:
-        if b["color"].lower() == color.lower():
-            return {"found": True, **b}
-    return _nf("box(color)", color)
+
+    matching = [
+        {"id": i, **b}
+        for i, b in enumerate(env.data["boxes"])
+        if b.get("color", "").lower() == color.lower()
+    ]
+
+    if not matching:
+        return _nf("box(color)", color)
+
+    return {
+        "found": True,
+        "count": len(matching),
+        "boxes": matching
+    }
+
 
 @tool
 def list_modules() -> List[str]:
@@ -168,6 +224,75 @@ def find_module(namespace: str):
 
     return _nf("module", namespace)
 
+@tool(args_schema={"x": float, "y": float})
+def find_closest_module(*, x: float, y: float) -> Dict[str, Any]:
+    """
+    Determine which warehouse module a given (x, y) mm point is in.
+    Uses rectangular footprint containment first; falls back to distance.
+    """
+    modules = _iter_modules()
+    if not modules:
+        return {"found": False,
+                "error": "No modules available in base_01/base_module_visualization"}
+
+    def euclidean(p1, p2):
+        return ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2) ** 0.5
+
+    def module_type(namespace: str) -> str:
+        if namespace.startswith("conveyor"):
+            return "conveyor"
+        if namespace.startswith("container"):
+            return "container"
+        if namespace.startswith("uarm"):
+            return "uarm"
+        if namespace.startswith("dock"):
+            return "dock"
+        return "unknown"
+
+    def is_inside(px, py, cx, cy, width, height):
+        return abs(px - cx) <= width / 2 and abs(py - cy) <= height / 2
+
+    # Realistic footprint estimates (W×H in mm)
+    FOOTPRINT_MM = {
+        "conveyor": (450, 150),     # long horizontal
+        "container": (150, 150),
+        "uarm": (200, 200),
+        "dock": (200, 200)
+    }
+
+    # 1. Check if point lies inside any module footprint
+    for m in modules:
+        ns = m["namespace"]
+        pose = m["pose"]
+        typ = module_type(ns)
+        w, h = FOOTPRINT_MM.get(typ, (150, 150))  # default to container size
+
+        if is_inside(x, y, pose["x"], pose["y"], w, h):
+            print(f"[DEBUG] Point is INSIDE {ns} (type={typ})")
+            return {
+                "found": True,
+                "namespace": ns,
+                "method": "footprint",
+                "distance": 0.0
+            }
+
+    # 2. Fallback to closest center if no match
+    target = (x, y)
+    best_mod, best_dist = None, float("inf")
+    for m in modules:
+        pose = m["pose"]
+        dist = euclidean(target, (pose["x"], pose["y"]))
+        if dist < best_dist:
+            best_mod, best_dist = m, dist
+
+    return {
+        "found": True,
+        "namespace": best_mod["namespace"],
+        "method": "distance",
+        "distance": best_dist
+    }
+
+
 # ── list every order response currently cached ────────────────────────────
 @tool
 def list_orders() -> dict:
@@ -189,9 +314,6 @@ def list_orders() -> dict:
     orders.sort(key=lambda p: p.get("header", {}).get("timestamp", 0),
                 reverse=True)
     return {"found": True, "orders": orders}
-
-
-
 
 @tool
 def find_last_order(args: dict = {}) -> dict:
@@ -404,7 +526,9 @@ ALL_TOOLS = [
     diagnose_failure,
     list_modules,
     master_status,
-    list_orders
+    list_orders,
+    plan_path,
+    find_closest_module
 ]
 
 # Default log level
@@ -441,6 +565,29 @@ def _ensure_dict(inp: Any) -> Dict[str, Any]:
                 return {"namespace": inp}
     raise ValueError("Unsupported input type")
 
+def find_closest_module_wrap(arg: Any) -> Dict[str, Any]:
+    """
+    Wrapper for the `find_closest_module` tool.
+
+    Accepts either…
+
+      • dict  –  { "x": 0.52, "y": 1.34 }
+      • str   –  "x=0.52, y=1.34"
+    """
+    try:
+        d = _ensure_dict(arg)
+
+        if "x" not in d or "y" not in d:
+            return {"found": False,
+                    "error": "find_closest_module expects numeric 'x' and 'y'."}
+
+        d["x"] = float(d["x"])
+        d["y"] = float(d["y"])
+
+        return find_closest_module.invoke(d)
+
+    except Exception as e:
+        return {"found": False, "error": f"Invalid input: {e}"}
 
 
 # ---------- one wrapper per original tool -------------------
@@ -466,6 +613,39 @@ def find_box_wrap(arg: Any):
         return find_box.invoke(d)
     except Exception as e:
         return {"found": False, "error": f"Invalid input to find_box: {e}"}
+
+def plan_path_wrap(arg: Any) -> dict:
+    """
+    Wrapper for the `plan_path` tool.
+    Accepts:
+      - dict: {"start": "conveyor_02", "goal": "container_02"}
+      - string: "start=conveyor_02, goal=container_02"
+    Resolves fuzzy module names using find_module_wrap.
+    """
+    try:
+        # --- Parse input ---
+        d = _ensure_dict(arg)
+
+        if "start" not in d or "goal" not in d:
+            return {"error": "Missing required keys: 'start' and 'goal'."}
+
+        # --- Fuzzy-match start and goal ---
+        start_info = find_module_wrap(d["start"])
+        goal_info  = find_module_wrap(d["goal"])
+
+        if not start_info.get("found"):
+            return {"error": f"Start module '{d['start']}' not found."}
+        if not goal_info.get("found"):
+            return {"error": f"Goal module '{d['goal']}' not found."}
+
+        # --- Run plan_path tool ---
+        return plan_path.invoke({
+            "start": start_info["namespace"],
+            "goal":  goal_info["namespace"]
+        })
+
+    except Exception as e:
+        return {"error": f"plan_path_wrap failed: {e}"}
 
 
 
@@ -607,6 +787,13 @@ MRKL_TOOLS = [
     Tool("master_status", lambda _="": master_status.invoke({}),
          "master_status() → is the master online?"),
     Tool("list_orders", list_orders_wrap,
-         "list_orders() → every cached order result (newest first)")
+         "list_orders() → every cached order result (newest first)"),
+    Tool("plan_path", plan_path_wrap,
+     "plan_path(start:str, goal:str) → List of module steps to follow"),
+    Tool(
+        "find_closest_module",
+        find_closest_module_wrap,
+        "find_closest_module(x:float, y:float) → nearest module namespace"
+    )
 ]
 

@@ -9,7 +9,7 @@ from langchain.memory import ConversationBufferMemory
 
 # -------- 1. LLM backend --------------------------------
 llm = ChatOllama(
-    model=os.getenv("OLLAMA_MODEL", "huihui_ai/qwen3-abliterated:latest"),
+    model=os.getenv("OLLAMA_MODEL", "qwen3:latest"),
     speed=os.getenv("OLLAMA_SPEED", "fast"),
     temperature=0.0
 )
@@ -34,61 +34,79 @@ agent = initialize_agent(
     agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
     verbose=True,
     memory=memory,
-    agent_type="OPENAI_FUNCTIONS",      # use the ReAct agent type
     max_iterations=None,
     limit_iterations=False,
     handle_parsing_errors=True,
-    agent_kwargs={
-        "prefix": """You are an AI agent integrated into a warehouse management system.  
-Follow these rules when reasoning and choosing actions:
+    agent_kwargs = {
+    # ------------ STATIC CONTEXT (prefix) ------------
+    "prefix": """SYSTEM: You are “Warehouse-Bot”, an AI orchestrator for conveyors, uArm robots, turtlebots, docks and containers.
 
-1. **System components and roles**  
-   • **Conveyors** move boxes in or out of the fixed layout.  
-   • **uArm robots** can pick/place between *any* two stationary modules that are inside their reach (e.g. conveyor ↔ uarm ↔ container, conveyor  ↔ uarm ↔  dock, dock  ↔ uarm ↔  container).  
-   • **Turtlebots** are mobile carriers: they always **start at one dock and finish at another dock**. They cannot load/unload anywhere except a dock, so a turtlebot leg in a route must appear as  
-     `dock_X → turtlebot_Y → dock_Z` (two docks, one turtlebot in between).  
-   • **Docks** are stationary transfer points used only by turtlebots and uArms.  
-   • **Containers** store boxes.  
-   Every module has a unique namespace (`uarm_01`, `dock_02`, …) and a global pose `(x, y, z, roll, pitch, yaw)`. Use these poses to judge distance and adjacency.
+    **Module cheat-sheet**
+    • Conveyors – move boxes into/out of the system and are the usual *start* point  
+    • uArm – pick/place between any two stationary modules in reach  
+    • Turtlebots – mobile carriers; always dock-to-dock  
+    • Docks – transfer hubs for uArms & turtlebots (never allowed as start or goal)  
+    • Containers – store boxes  
 
-2. **Automatic spelling correction**  
-   Fuzzy-match user input to the closest module or colour name (e.g. “uarn_02” → “uarm_02”).
+    Every module has a unique ID (e.g. `uarm_01`) and a pose `(x, y, z, roll, pitch, yaw)`—use this to judge reach and adjacency.
+    
+    
+    **Rules**
+    1. **No path planning** – output only `start_module → end_module`.  
+    2. If the request is ambiguous, ask a clarifying question *before* any tool call.  
+    3. **Retry** a failed tool call up to **2** extra times, then report failure in final answer. 
+    4. Dispatch orders **sequentially**; wait for completion/timeout before the next.  
+    5. Stop when the goal is met and write `Final Answer: <solution>`.  
+    6. **Never use a dock** as `start` or `goal`; docks are for turtlebots only.  
 
-3. **Path-planning requests (user did **not** ask to execute)**  
-   • Call `list_modules` first.  
-   • For any module you need, call `find_module(<namespace>)` to fetch its pose.  
-   • Decide the route:  
-     – the path always include a uarm unleass it is from a dock to a dock via turtlebot,
-     - a uArm can reach up to around 200-500 units.
-     – If the start and goal are within one uArm’s reach, return `[start, uarm, goal]`.  
-     – If they are too far, chain modules to bridge the gap:  
-       ▸ A uArm can hand off between two nearby stationary modules.  
-       ▸ A turtlebot leg must be `dock → turtlebot → dock` and is used when there is a large floor distance between two distant areas.  
-     – Choose the sequence that minimises total distance while respecting the rules above.  
-   • **Return only the ordered list of module namespaces** (e.g.  
-     `["conveyor_02", "uarm_02", "dock_01", "turtlebot_01", "dock_02", "uarm_01", "container_01"]`).  
-   • **Do NOT** call `trigger_order` unless the user explicitly requests execution.
+    Fuzzy-match misspelled module or colour names.""",
 
-4. **Triggering an order**  
-   Ignore box pose; provide just the relevant module names.
+        # ------------ HOW TO FORMAT TOOL CALLS ------------
+        "format_instructions": """Use the ReAct loop **exactly** as shown:
 
-5. **Avoid tool loops** – if one tool call fails, try an alternative.
+    Thought: reflect on what to do  
+    Action: one of [{tool_names}]  
+    Action Input: JSON or plain text for the tool  
+    Observation: tool output  
+    (Repeat Thought / Action / Action Input / Observation as needed.)  
+    Thought: I now know the final answer  
+    Final Answer: <answer to user>
 
-6. **Sequential orders** – wait for an order to finish (or time-out) before dispatching the next.
+    Do **not** add any text outside this schema.
+    Do **not** the same tool over and over again, use different tools in case if one tool did not worl.
+    **Always** provide a final answer at the end of the conversation.
 
-7. **Stop when the goal is achieved** – return the answer and cease tool calls.
+    ────────────────────────────────────────────────────────
+    🛈  **trigger_order cheat-sheet**
+    
+    if the modules namespace are not provided, find the closest module to the start pose and use it as start module using find_closest_module tool then find the closest module to the goal pose and use it as goal module using  find_closest_module tool.
+    
+    ✅ *VALID* examples  
+      • start=conveyor_02, goal=container_01, box_id=0  
+      • start=container_01, goal=container_02, box_id=0  
+      • start=conveyor_02, goal=container_01, box_color=green  
+      • start=container_01, goal=container_02, box_color=red  
 
-8. **Retry policy for failed orders** – retry twice (three attempts total), then report failure.
+    ❌ *INVALID* examples (will raise errors)  
+      • \"start\":\"container_01\",\"goal\":\"container_02\",\"box_id\":0,\"wait_timeout\":120   # timeout key ignored  
+      • \"start\":\"dock_01\",\"goal\":\"container_02\",\"box_id\":0                          # dock used as start  
+      • \"start\":\"container_01\",\"goal\":\"dock_01\",\"box_id\":0                          # dock used as goal  
+      • \"start\":\"container_01\",\"goal\":\"container_02\",\"box_id\":\"red\"                 # box_id must be int  
+      • \"start\":\"container_01\",\"goal\":\"container_02\",\"box_color\":0                  # box_color must be str
 
-9. **IMPORTANT** – when you are done, end with  
-   `Final Answer: <your answer>` (nothing after that line).
+────────────────────────────────────────────────────────""",
 
-You have access to the following tools:""",
+        # ------------- DYNAMIC SUFFIX ---------------------
+        "suffix": """Begin. Remember to reason step by step. and don't trigger an order unless the user explicitly asks for it and whem triggering an order don't look for a box or call find box function only the modules are matter.
 
-        "suffix": """Begin. Remember to reason step-by-step, call tools when data is needed, and never trigger an order unless the user explicitly requests it.
-Question: {input}
-{agent_scratchpad}"""
+    {chat_history}
+    Question: {input}
+    {agent_scratchpad}""",
+
+        # ------------- SAFETY: HARD STOP ------------------
+        "stop_sequence": ["Final Answer:"]
     }
+
 )
 
-warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
+#warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
