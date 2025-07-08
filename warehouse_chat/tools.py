@@ -224,6 +224,7 @@ def find_module(namespace: str):
 
     return _nf("module", namespace)
 
+
 @tool(args_schema={"x": float, "y": float})
 def find_closest_module(*, x: float, y: float) -> Dict[str, Any]:
     """
@@ -343,18 +344,18 @@ def find_last_order(args: dict = {}) -> dict:
     # optional – how long (s) to wait for a response
     "wait_timeout": int
 })
-def trigger_order(*,
-                  start: str | None = None,
-                  goal: str | None = None,
-                  start_pose: dict | None = None,
-                  goal_pose:  dict | None = None,
-                  box_id:     int  | None = None,
-                  box_color:  str  | None = None,
-                  box_pose:   dict | None = None,
-                  wait_timeout: int = 60) -> dict:
+def trigger_order(
+    *,
+    start: str | None = None,
+    goal: str | None = None,
+    start_pose: dict | None = None,
+    goal_pose: dict  | None = None,
+    box_id:    int   | None = None,
+    box_color: str   | None = None,
+    box_pose:  dict  | None = None,
+) -> dict:
     """
-    Dispatch a transport order **and block until the master answers** or
-    *wait_timeout* seconds elapse.
+    Dispatch a transport order **and block up to 60 s** for a response.
 
     Required (pick one in each row):
     • `start`      **or** `start_pose`
@@ -379,9 +380,9 @@ def trigger_order(*,
             raise ValueError("provide either 'start' or 'start_pose'")
 
         if goal is not None:
-            goal_pose_val,  goal_ns  = _pose_from_module(goal), goal
+            goal_pose_val, goal_ns = _pose_from_module(goal), goal
         elif goal_pose is not None:
-            goal_pose_val,  goal_ns  = goal_pose, "manual_pose_goal"
+            goal_pose_val, goal_ns = goal_pose, "manual_pose_goal"
         else:
             raise ValueError("provide either 'goal' or 'goal_pose'")
 
@@ -408,7 +409,7 @@ def trigger_order(*,
             "correlation_id": correlation_id
         },
         "starting_module": {"namespace": start_ns, "pose": start_pose_val},
-        "goal":            {"namespace": goal_ns,   "pose": goal_pose_val},
+        "goal":            {"namespace": goal_ns,  "pose": goal_pose_val},
         "cargo_box":       cargo_box
     }
 
@@ -419,9 +420,9 @@ def trigger_order(*,
 
     print(f"[trigger_order] ➡ Dispatched order {correlation_id}")
 
-    # ── 3. wait for the matching response ─────────────────────────────
+    # ── 3. wait (max 60 s) for the matching response ──────────────────
     t0 = time.time()
-    while time.time() - t0 < wait_timeout:
+    while time.time() - t0 < 60:
         result = _order_results.get(correlation_id)
         if result:                       # got it!
             success = bool(result.get("success", False))
@@ -437,8 +438,9 @@ def trigger_order(*,
     return {
         "found": False,
         "correlation_id": correlation_id,
-        "error": f"No response within {wait_timeout}s."
+        "error": "No response within 60 s."
     }
+
 
 @tool
 def confirm_last_order():
@@ -739,8 +741,7 @@ def trigger_order_wrap(arg: Any) -> dict:
             "goal_pose": args.get("goal_pose"),
             "box_id": args.get("box_id"),
             "box_color": args.get("box_color"),
-            "box_pose": args.get("box_pose"),
-            "wait_timeout": int(args.get("wait_timeout", 60))
+            "box_pose": args.get("box_pose")
         }
 
         return trigger_order.invoke(final_args)
@@ -771,12 +772,10 @@ MRKL_TOOLS = [
     Tool("trigger_order", trigger_order_wrap,
     (
         "trigger_order(start|start_pose, goal|goal_pose "
-        "[, box_id:int, box_color:str, box_pose:dict, wait_timeout:int]) "
+        "[, box_id:int, box_color:str, box_pose:dict]) "
         "→ dispatch the order **and wait for the master’s response**.\n"
         "Examples:\n"
         "  • trigger_order(start=container_02, goal=container_01, box_color=blue)\n"
-        "  • trigger_order(x=0.4, y=0.3, goal=dock_03,\n"
-        "                 bx=0.9, by=0.1, box_id=42, wait_timeout=120)"
     )),
     Tool("confirm_last_order", confirm_last_order_wrap,
          "confirm_last_order() → success / failed"),

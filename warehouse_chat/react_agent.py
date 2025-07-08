@@ -35,7 +35,7 @@ agent = initialize_agent(
     verbose=True,
     memory=memory,
     max_iterations=None,
-    limit_iterations=False,
+    limit_iterations=10,
     handle_parsing_errors=True,
     agent_kwargs = {
     # ------------ STATIC CONTEXT (prefix) ------------
