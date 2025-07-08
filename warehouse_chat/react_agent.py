@@ -4,13 +4,17 @@ from langchain.agents import Tool, initialize_agent, AgentType
 from langchain_ollama import ChatOllama
 from tools import ALL_TOOLS 
 from tools import MRKL_TOOLS     # your tool objects
+from langchain.memory import ConversationBufferMemory
 
 
 # -------- 1. LLM backend --------------------------------
 llm = ChatOllama(
     model=os.getenv("OLLAMA_MODEL", "qwen3:latest"),
+    speed=os.getenv("OLLAMA_SPEED", "fast"),
     temperature=0.0
 )
+
+memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
 # -------- 2. Wrap your tools so LangChain can call them --
 toolkit = []
@@ -29,23 +33,80 @@ agent = initialize_agent(
     llm=llm,
     agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
     verbose=True,
+    memory=memory,
+    max_iterations=None,
+    limit_iterations=10,
     handle_parsing_errors=True,
-    agent_kwargs={
-        "prefix": """You are an AI agent integrated into a warehouse management system. Follow these guidelines when interpreting requests and deciding on actions:
+    agent_kwargs = {
+    # ------------ STATIC CONTEXT (prefix) ------------
+    "prefix": """SYSTEM: You are “Warehouse-Bot”, an AI orchestrator for conveyors, uArm robots, turtlebots, docks and containers.
 
-1. System Components and Roles: You understand the warehouse consists of various modules such as conveyors, docks, containers, and uArm robots. Conveyors move boxes in and out of the system, docks are used to load/unload external goods, containers store boxes, and uArm robots can pick and place boxes. Each module has a unique identifier (e.g., uarm_01, conveyor_02) and a known global pose (x, y, z coordinates and orientation). You can use this pose information to reason about spatial relationships between modules (for example, which modules are adjacent or how far apart they are).
+    **Module cheat-sheet**
+    • Conveyors – move boxes into/out of the system and are the usual *start* point  
+    • uArm – pick/place between any two stationary modules in reach  
+    • Turtlebots – mobile carriers; always dock-to-dock  
+    • Docks – transfer hubs for uArms & turtlebots (never allowed as start or goal)  
+    • Containers – store boxes  
 
-2. Automatic Spelling Correction: Always account for possible typos or misspellings in user commands. If a user references a module or box color that doesn’t exactly match a known name, attempt to infer the correct reference via fuzzy matching. For example, if the user says "uarn_02" and the closest matching module is "uarm_02", assume the user meant "uarm_02" and proceed using that module name.
+    Every module has a unique ID (e.g. `uarm_01`) and a pose `(x, y, z, roll, pitch, yaw)`—use this to judge reach and adjacency.
+    
+    
+    **Rules**
+    1. **No path planning** – output only `start_module → end_module`.  
+    2. If the request is ambiguous, ask a clarifying question *before* any tool call.  
+    3. **Retry** a failed tool call up to **2** extra times, then report failure in final answer. 
+    4. Dispatch orders **sequentially**; wait for completion/timeout before the next.  
+    5. Stop when the goal is met and write `Final Answer: <solution>`.  
+    6. **Never use a dock** as `start` or `goal`; docks are for turtlebots only.  
 
-3. When triggering an order, ignore the box position and just use the module name. For example, if the user says "trigger order for uarm_01", you should trigger the order for uarm_01 without considering the box position.
+    Fuzzy-match misspelled module or colour names.""",
 
-You have access to the following tools:""",
-        "suffix": """Begin. Remember to reason step by step. and don't trigger an order unless the user explicitly asks for it.
-Question: {input}
-{agent_scratchpad}"""
+        # ------------ HOW TO FORMAT TOOL CALLS ------------
+        "format_instructions": """Use the ReAct loop **exactly** as shown:
+
+    Thought: reflect on what to do  
+    Action: one of [{tool_names}]  
+    Action Input: JSON or plain text for the tool  
+    Observation: tool output  
+    (Repeat Thought / Action / Action Input / Observation as needed.)  
+    Thought: I now know the final answer  
+    Final Answer: <answer to user>
+
+    Do **not** add any text outside this schema.
+    Do **not** the same tool over and over again, use different tools in case if one tool did not worl.
+    **Always** provide a final answer at the end of the conversation.
+
+    ────────────────────────────────────────────────────────
+    🛈  **trigger_order cheat-sheet**
+    
+    if the modules namespace are not provided, find the closest module to the start pose and use it as start module using find_closest_module tool then find the closest module to the goal pose and use it as goal module using  find_closest_module tool.
+    
+    ✅ *VALID* examples  
+      • start=conveyor_02, goal=container_01, box_id=0  
+      • start=container_01, goal=container_02, box_id=0  
+      • start=conveyor_02, goal=container_01, box_color=green  
+      • start=container_01, goal=container_02, box_color=red  
+
+    ❌ *INVALID* examples (will raise errors)  
+      • \"start\":\"container_01\",\"goal\":\"container_02\",\"box_id\":0,\"wait_timeout\":120   # timeout key ignored  
+      • \"start\":\"dock_01\",\"goal\":\"container_02\",\"box_id\":0                          # dock used as start  
+      • \"start\":\"container_01\",\"goal\":\"dock_01\",\"box_id\":0                          # dock used as goal  
+      • \"start\":\"container_01\",\"goal\":\"container_02\",\"box_id\":\"red\"                 # box_id must be int  
+      • \"start\":\"container_01\",\"goal\":\"container_02\",\"box_color\":0                  # box_color must be str
+
+────────────────────────────────────────────────────────""",
+
+        # ------------- DYNAMIC SUFFIX ---------------------
+        "suffix": """Begin. Remember to reason step by step. and don't trigger an order unless the user explicitly asks for it and whem triggering an order don't look for a box or call find box function only the modules are matter.
+
+    {chat_history}
+    Question: {input}
+    {agent_scratchpad}""",
+
+        # ------------- SAFETY: HARD STOP ------------------
+        "stop_sequence": ["Final Answer:"]
     }
+
 )
 
-warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
-
-
+#warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
