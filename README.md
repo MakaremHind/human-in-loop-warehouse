@@ -52,7 +52,7 @@ You can find more detailes in the final report: https://drive.google.com/file/d/
 
 ```bash
 # Clone & install
-git clone https://gitlab.kit.edu/kit/ifl/forschung/mmh_lab/projects/human-in-loop-warehouse.git
+git clone https://gitlab.kit.edu/kit/ifl/forschung/mmh_lab/projects/mmh_agent/human-in-loop-warehouse.git
 cd .\warehouse_chat\
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt   # see requirements.txt for Python deps
