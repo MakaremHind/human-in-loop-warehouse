@@ -1,4 +1,12 @@
 # react_agent.py
+# -----------------------------------------------------------------------------
+# Warehouse ReAct Agent Setup
+# -----------------------------------------------------------------------------
+# This module configures the LangChain ReAct agent for the warehouse system.
+# It sets up the LLM backend, tool wrappers, and agent prompt instructions.
+# All logic is preserved as in the original code.
+# -----------------------------------------------------------------------------
+
 import warnings, os
 from langchain.agents import Tool, initialize_agent, AgentType
 from langchain_ollama import ChatOllama
@@ -6,8 +14,9 @@ from tools import ALL_TOOLS
 from tools import MRKL_TOOLS     # your tool objects
 from langchain.memory import ConversationBufferMemory
 
-
-# -------- 1. LLM backend --------------------------------
+# -----------------------------------------------------------------------------
+# 1. LLM BACKEND
+# -----------------------------------------------------------------------------
 llm = ChatOllama(
     model=os.getenv("OLLAMA_MODEL", "qwen3:latest"),
     speed=os.getenv("OLLAMA_SPEED", "fast"),
@@ -16,7 +25,9 @@ llm = ChatOllama(
 
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
-# -------- 2. Wrap your tools so LangChain can call them --
+# -----------------------------------------------------------------------------
+# 2. TOOL WRAPPERS FOR LANGCHAIN
+# -----------------------------------------------------------------------------
 toolkit = []
 for t in ALL_TOOLS:
     toolkit.append(
@@ -27,7 +38,9 @@ for t in ALL_TOOLS:
         )
     )
 
-# -------- 3. Build the ReAct agent ----------------------
+# -----------------------------------------------------------------------------
+# 3. BUILD THE REACT AGENT
+# -----------------------------------------------------------------------------
 agent = initialize_agent(
     tools=MRKL_TOOLS,                 # single-input wrappers
     llm=llm,
@@ -38,8 +51,8 @@ agent = initialize_agent(
     limit_iterations=10,
     handle_parsing_errors=True,
     agent_kwargs = {
-    # ------------ STATIC CONTEXT (prefix) ------------
-    "prefix": """SYSTEM: You are “Warehouse-Bot”, an AI orchestrator for conveyors, uArm robots, turtlebots, docks and containers.
+        # ------------ STATIC CONTEXT (prefix) ------------
+        "prefix": """SYSTEM: You are “Warehouse-Bot”, an AI orchestrator for conveyors, uArm robots, turtlebots, docks and containers.
 
     **Module cheat-sheet**
     • Conveyors – move boxes into/out of the system and are the usual *start* point  
@@ -81,13 +94,13 @@ agent = initialize_agent(
     
     if the modules namespace are not provided, find the closest module to the start pose and use it as start module using find_closest_module tool then find the closest module to the goal pose and use it as goal module using  find_closest_module tool.
     
-    ✅ *VALID* examples  
+     *VALID* examples  
       • start=conveyor_02, goal=container_01, box_id=0  
       • start=container_01, goal=container_02, box_id=0  
       • start=conveyor_02, goal=container_01, box_color=green  
       • start=container_01, goal=container_02, box_color=red  
 
-    ❌ *INVALID* examples (will raise errors)  
+     *INVALID* examples (will raise errors)  
       • \"start\":\"container_01\",\"goal\":\"container_02\",\"box_id\":0,\"wait_timeout\":120   # timeout key ignored  
       • \"start\":\"dock_01\",\"goal\":\"container_02\",\"box_id\":0                          # dock used as start  
       • \"start\":\"container_01\",\"goal\":\"dock_01\",\"box_id\":0                          # dock used as goal  
@@ -106,7 +119,9 @@ agent = initialize_agent(
         # ------------- SAFETY: HARD STOP ------------------
         "stop_sequence": ["Final Answer:"]
     }
-
 )
 
-#warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
+# warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
+# -----------------------------------------------------------------------------
+# END OF FILE
+# -----------------------------------------------------------------------------

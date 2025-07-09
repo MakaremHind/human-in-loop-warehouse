@@ -1,6 +1,13 @@
 # main.py
-from __future__ import annotations
+# -----------------------------------------------------------------------------
+# Warehouse Chat Main Entry Point (REPL)
+# -----------------------------------------------------------------------------
+# This script launches the interactive chat loop for the warehouse agent system.
+# It handles graceful shutdown, user input, agent invocation, and result display.
+# All logic is preserved as in the original code.
+# -----------------------------------------------------------------------------
 
+from __future__ import annotations
 import signal
 import sys
 import threading
@@ -11,7 +18,9 @@ import mqtt_listener  # noqa – imported for its side-effects (snapshot feed)
 from react_agent import agent
 from snapshot_manager import snapshot_store
 
-# ────────────────────────────── graceful shutdown ─────────────────────────────
+# -----------------------------------------------------------------------------
+# GRACEFUL SHUTDOWN HANDLING
+# -----------------------------------------------------------------------------
 shutdown_event = threading.Event()
 
 
@@ -31,7 +40,9 @@ def _handle_sigint(signum: int, frame):  # noqa: D401 – simple callback
 
 signal.signal(signal.SIGINT, _handle_sigint)
 
-# ────────────────────────────── main REPL loop ────────────────────────────────
+# -----------------------------------------------------------------------------
+# MAIN REPL LOOP
+# -----------------------------------------------------------------------------
 chat_history: list[tuple[str, str]] = []
 
 print("[Chat] Type 'quit' to exit.")
@@ -92,3 +103,7 @@ while not shutdown_event.is_set():
                 break
         else:
             print("Bot: Timed out waiting for order result.")
+
+# -----------------------------------------------------------------------------
+# END OF FILE
+# -----------------------------------------------------------------------------
