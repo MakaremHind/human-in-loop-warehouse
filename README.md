@@ -16,13 +16,15 @@ The system enables:
 - Tool-assisted planning and error handling using a ReAct-based LLM agent.
 - Full integration with physical hardware over MQTT.
 
+You can find more detailes in the final report: https://drive.google.com/file/d/13rG88XYNQ7N0OOURhNMmfSqevb8P6ioh/view?usp=sharing
+
 ---
 
 ## Project Structure
 
 ```
 .
-├── agent.py               # LangGraph planner with tool-chaining (ReAct)
+├── agent.py               # LangGraph planner with tool-chaining (first draft of the agent)
 ├── react_agent.py        # LangChain zero-shot ReAct agent (Gradio)
 ├── tools.py              # Domain-specific tools for warehouse control
 ├── app.py                # Gradio interface (UI)
@@ -40,7 +42,7 @@ The system enables:
 - Enable non-technical users to control an intralogistics system via natural language.
 - Design and evaluate a ReAct agent capable of tool invocation, clarification, and fallback.
 - Support transport orders, cancellations, planning, and live status monitoring.
-- Demonstrate that a fully local, on-premise LLM (Qwen-3) can match latency and reliability needs.
+- Demonstrate that a fully local, on-premise LLM (Qwen-3: Latest) can match latency and reliability needs.
 
 ---
 
@@ -59,17 +61,18 @@ pip install -r requirements.txt   # see requirements.txt for Python deps
 ### Prerequisites
 
 - Python 3.10+
-- A running MQTT broker (default: `192.168.50.100`) (do not forget to connect to one of the mmh lab wifi network; name: `MMH_LAB_5Ghz` password: `ifl_2022` or name: `MMH_LAB_2Ghz` password: `ifl_2022`)
+- A running MQTT broker (default: `192.168.50.100`) (do not forget to connect to one of the mmh lab wifi networks; like `MMH_LAB_5Ghz` password: `ifl_2022` or `MMH_LAB_2Ghz` password: `ifl_2022`)
 - An Ollama-compatible model (tested with `qwen3:latest`) (you need to pull it and use it locally)
 
 
 ## Running the System
 
-### 1. 🧑‍💻 Terminal Interface (CLI)
+### 1. Terminal Interface (CLI)
 
 ```bash
-python main.py
+python main.py #make sure that you are in 'warehouse_chat' dir
 ```
+to quit you can type: ctrl+c
 
 You can type commands like:
 ```
@@ -88,16 +91,12 @@ The agent will:
 ### 2. Gradio Web Interface
 
 ```bash
-python app.py
+gradio app.py #make sure that you are in 'warehouse_chat' dir
 ```
 
 Then open the Gradio UI in your browser (usually at http://localhost:7860).
 
-Features:
-- Logo branding (KIT & MMH Lab)
-- Message history and visual agent trace
-- Colored reasoning log (Thoughts, Actions, Observations)
-
+![alt text](image.png)
 ---
 
 ## Available Capabilities
@@ -106,9 +105,9 @@ The agent supports natural-language queries such as:
 
 | Example Question | What it Does |
 |------------------|--------------|
-| "Move box 1 to container_02" | Plans a path, dispatches order |
+| "Move box 1 to container_02" | dispatches order |
 | "Where is the red box?" | Finds box position |
-| "Cancel the current job" | Aborts active transport |
+| "Revert the last order" | Return the box |
 | "List all modules" | Returns module list |
 | "Which module is closest to (x,y)?" | Runs spatial matching |
 | "Why did the last order fail?" | Diagnostic reasoning |
@@ -119,7 +118,6 @@ The agent supports natural-language queries such as:
 
 - **MQTT Topics**: System listens to `mmh_cam/detected_boxes`, `base_01/order_request`, etc.
 - **LLM Agent**: Built using `LangGraph`, `LangChain`, and `ChatOllama`
-- **Planning Logic**: Multi-step plans are executed via `LangGraph` graph nodes (`agent.py`)
 - **Snapshot Store**: Live MQTT messages are normalized into typed `Envelope` objects (`models.py`)
 
 ---
