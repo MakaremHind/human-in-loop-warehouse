@@ -1,11 +1,18 @@
 # models.py
+# -----------------------------------------------------------------------------
+# Warehouse Data Models and Message Normalizer
+# -----------------------------------------------------------------------------
+# This module defines the Pydantic models for warehouse entities and provides
+# a message normalization function for incoming raw data. All logic is preserved.
+# -----------------------------------------------------------------------------
+
 from typing import List, Literal, Dict, Any, Union
 from pydantic import BaseModel
 import json
 
-
-# ─────────────── Base types ───────────────
-
+# -----------------------------------------------------------------------------
+# BASE TYPES
+# -----------------------------------------------------------------------------
 class Pose(BaseModel):
     x: float
     y: float
@@ -14,50 +21,50 @@ class Pose(BaseModel):
     pitch: float
     yaw: float
 
-
-# ─────────────── Data item types ───────────────
-
+# -----------------------------------------------------------------------------
+# DATA ITEM TYPES
+# -----------------------------------------------------------------------------
 class Box(BaseModel):
     id: int
     color: str
     kind: str
     pose: Pose
 
-
 class Fiducial(BaseModel):
     id: int
     type: Literal["aruco"]
     pose: Pose
 
-
 class ModulePose(BaseModel):
     namespace: str
     pose: Pose
-
 
 class Region(BaseModel):
     top_corner: Pose
     bottom_corner: Pose
     height: float
 
-
 class OrderResult(BaseModel):
     starting_module: ModulePose
     goal: ModulePose
     cargo_box: Box
 
-
-# ─────────────── Envelope ───────────────
-
+# -----------------------------------------------------------------------------
+# ENVELOPE TYPE
+# -----------------------------------------------------------------------------
 class Envelope(BaseModel):
     header: Dict[str, Any]
     type: Literal["BoxArray", "FiducialArray", "ModulePoseArray", "RegionArray", "OrderResult"]
     data: Dict[str, Any]  # usually {"items": [...]}, or {"order": {...}} for orders
 
-
-# ─────────────── Normalizer ───────────────
-
+# -----------------------------------------------------------------------------
+# MESSAGE NORMALIZER
+# -----------------------------------------------------------------------------
 def normalize_message(raw: Dict) -> Envelope:
+    """
+    Normalize a raw message dict into a standard Envelope object.
+    Handles boxes, fiducials, modules, regions, and order results.
+    """
     env: Dict[str, Any] = {"header": raw.get("header", {})}
 
     if "boxes" in raw:
@@ -121,3 +128,7 @@ def normalize_message(raw: Dict) -> Envelope:
         raise ValueError("Unrecognised message format")
 
     return Envelope.model_validate(env)
+
+# -----------------------------------------------------------------------------
+# END OF FILE
+# -----------------------------------------------------------------------------

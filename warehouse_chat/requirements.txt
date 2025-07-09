@@ -1,3 +1,11 @@
+# requirements.txt
+# -----------------------------------------------------------------------------
+# Python requirements for Warehouse Chatbot Project
+# -----------------------------------------------------------------------------
+# This file lists all packages needed to run the project, including web UI,
+# agent, MQTT, and data handling dependencies.
+# -----------------------------------------------------------------------------
+
 langchain
 langchain-core
 langgraph
@@ -6,4 +14,20 @@ paho-mqtt
 pydantic
 typing-extensions
 rapidfuzz
+gradio
+# For Gradio UI and web app
+
+# For date/time and file handling (standard library, but included for clarity)
+# datetime
+# pathlib
+
+# For agent and callback handling
+# (langchain already covers callbacks)
+
+# For compatibility with Python 3.10+
+# (no extra packages needed if using Python 3.10+)
+
+# -----------------------------------------------------------------------------
+# END OF FILE
+# -----------------------------------------------------------------------------
 

@@ -1,18 +1,22 @@
-#tools.py
-from typing import Dict, Any
+# tools.py
+# -----------------------------------------------------------------------------
+# Warehouse Chat Tools
+# -----------------------------------------------------------------------------
+# This module provides a set of tools for interacting with the warehouse system.
+# It includes MQTT communication, module/box lookup, order dispatch, and wrappers
+# for MRKL/agent compatibility. All logic is preserved as in the original code.
+# -----------------------------------------------------------------------------
+
+from typing import Dict, Any, List
 import logging, json, time, uuid, threading
 import paho.mqtt.client as mqtt
 from langchain_core.tools import tool
 from models import Envelope, normalize_message
-from mqtt_listener import get
+from mqtt_listener import get, BROKER_CONNECTED, LAST_MASTER_MSG
 from snapshot_manager import snapshot_store   # keeps type checkers happy
-from typing import List
-from mqtt_listener import BROKER_CONNECTED, LAST_MASTER_MSG
-ONLINE_TIMEOUT = 30.0      # seconds without a master message → “offline”
 from rapidfuzz import process
 
-
-# MQTT CONFIG
+# MQTT CONFIGURATION
 BROKER  = "192.168.50.100"
 PORT    = 1883
 ORDER_REQUEST_TOPIC        = "base_01/order_request"
@@ -24,12 +28,19 @@ _result_listener_started = False
 cancelled_orders = set()
 current_order_id  = None
 
+# TIMEOUTS
+ONLINE_TIMEOUT = 30.0      # seconds without a master message → “offline”
+
+# -----------------------------------------------------------------------------
 # INTERNAL UTILITIES
+# -----------------------------------------------------------------------------
 def _nf(entity: str, key: Any) -> Dict[str, Any]:
     """Return a standard ‘not-found’ payload."""
     return {"found": False, "error": f"{entity} '{key}' not found"}
 
+
 def _iter_modules():
+    """Yield all modules from the current snapshot (normalized or raw)."""
     env = get("base_01/base_module_visualization")
     if not env:
         return []
@@ -39,6 +50,9 @@ def _iter_modules():
         or env.data.get("modules", [])        # raw, just in case
     )
 
+# -----------------------------------------------------------------------------
+# TOOL DEFINITIONS (LangChain @tool)
+# -----------------------------------------------------------------------------
 @tool
 def master_status() -> dict:
     """
@@ -60,8 +74,6 @@ def master_status() -> dict:
     }
 
 
-    
-    
 def _pose_from_module(namespace: str):
     modules = _iter_modules()
     print(f"[DEBUG] Looking for module '{namespace}' in {[m['namespace'] for m in modules]}")
@@ -516,7 +528,9 @@ def diagnose_failure() -> dict:
     }
 
 
+# -----------------------------------------------------------------------------
 # PUBLIC EXPORT
+# -----------------------------------------------------------------------------
 ALL_TOOLS = [
     find_box,
     find_box_by_color,
@@ -795,4 +809,8 @@ MRKL_TOOLS = [
         "find_closest_module(x:float, y:float) → nearest module namespace"
     )
 ]
+
+# -----------------------------------------------------------------------------
+# END OF FILE
+# -----------------------------------------------------------------------------
 

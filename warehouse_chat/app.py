@@ -1,3 +1,11 @@
+# app.py
+# -----------------------------------------------------------------------------
+# Warehouse Chatbot Gradio App
+# -----------------------------------------------------------------------------
+# This script launches the Gradio web UI for the warehouse chatbot, including
+# session management, agent invocation, and UI layout. All logic is preserved.
+# -----------------------------------------------------------------------------
+
 # app.py  ────────────────────────────────────────────────────────────────────
 import gradio as gr
 from checklist_state import ChecklistState
@@ -45,11 +53,10 @@ def colourise(raw: str) -> str:
 
 # ─── agent wrappers ───────────────────────────────────────────────
 def agent_reply(user_msg: str, history: list, checklist_state: ChecklistState):
+    """Handles a user message, updates history, and streams agent output."""
     checklist_state.__init__()                          # reset
-
     history.append({"role": "user", "content": user_msg})
     history.append({"role": "assistant", "content": "…"})
-
     yield history, history, gr.update(value=checklist_state.render())
 
     updates = []
@@ -172,3 +179,7 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Soft()) as demo:
 # ─────────────────────────── run app ───────────────────────────────────────
 if __name__ == "__main__":
     demo.launch()
+
+# -----------------------------------------------------------------------------
+# END OF FILE
+# -----------------------------------------------------------------------------
