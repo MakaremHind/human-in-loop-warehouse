@@ -91,7 +91,7 @@
   },
   "mmh_cam/detected_markers": {
     "header": {
-      "timestamp": 1752064247.2135837,
+      "timestamp": 1752064490.5594354,
       "module_id": "1",
       "correlation_id": "7e39f6ee-b202-4c5b-bff9-268121b632a3",
       "version": 1.0,
@@ -159,30 +159,6 @@
         "type": "aruco"
       },
       {
-        "id": 16,
-        "relative_pose": {
-          "x": 370.7290954589844,
-          "y": 444.68585205078125,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": 1.545373797416687
-        },
-        "type": "aruco"
-      },
-      {
-        "id": 9,
-        "relative_pose": {
-          "x": 154.14578247070312,
-          "y": 383.18524169921875,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": -0.03384169563651085
-        },
-        "type": "aruco"
-      },
-      {
         "id": 22,
         "relative_pose": {
           "x": 232.40296936035156,
@@ -219,18 +195,6 @@
         "type": "aruco"
       },
       {
-        "id": 4,
-        "relative_pose": {
-          "x": 781.6384887695312,
-          "y": 46.272254943847656,
-          "z": 0.0,
-          "roll": 0.0,
-          "pitch": 0.0,
-          "yaw": -0.04292118921875954
-        },
-        "type": "aruco"
-      },
-      {
         "id": 7,
         "relative_pose": {
           "x": 22.817659378051758,
@@ -243,6 +207,18 @@
         "type": "aruco"
       },
       {
+        "id": 4,
+        "relative_pose": {
+          "x": 781.6384887695312,
+          "y": 46.272254943847656,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -0.04292118921875954
+        },
+        "type": "aruco"
+      },
+      {
         "id": 17,
         "relative_pose": {
           "x": 973.4017944335938,
@@ -250,7 +226,7 @@
           "z": 0.0,
           "roll": 0.0,
           "pitch": 0.0,
-          "yaw": 1.5359058380126953
+          "yaw": 1.5374526977539062
         },
         "type": "aruco"
       },
@@ -275,6 +251,30 @@
           "roll": 0.0,
           "pitch": 0.0,
           "yaw": 1.5837949514389038
+        },
+        "type": "aruco"
+      },
+      {
+        "id": 16,
+        "relative_pose": {
+          "x": 370.7290954589844,
+          "y": 444.68585205078125,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": 1.545373797416687
+        },
+        "type": "aruco"
+      },
+      {
+        "id": 9,
+        "relative_pose": {
+          "x": 154.14578247070312,
+          "y": 383.18524169921875,
+          "z": 0.0,
+          "roll": 0.0,
+          "pitch": 0.0,
+          "yaw": -0.03384169563651085
         },
         "type": "aruco"
       },
@@ -306,7 +306,7 @@
   },
   "mmh_cam/detected_boxes": {
     "header": {
-      "timestamp": 1752064247.2196805,
+      "timestamp": 1752064490.559135,
       "module_id": "1",
       "correlation_id": "7e39f6ee-b202-4c5b-bff9-268121b632a3",
       "version": 1.0,
@@ -331,8 +331,8 @@
         "color": "red",
         "type": "small_box",
         "global_pose": {
-          "x": 293.65606689453125,
-          "y": 121.64747619628906,
+          "x": 294.495361328125,
+          "y": 121.64500427246094,
           "z": 47.0,
           "roll": 0.0,
           "pitch": 0.0,
@@ -343,9 +343,9 @@
   },
   "base_01/base_module_visualization": {
     "header": {
-      "timestamp": 1752064247.3332918,
+      "timestamp": 1752064490.6369963,
       "module_id": "0",
-      "correlation_id": "7d80efab-e982-42b4-acfb-98dc06d728f5",
+      "correlation_id": "1ef49c31-e7d2-46e3-9ede-62de428592bf",
       "version": 1.0,
       "duplicate": false
     },
